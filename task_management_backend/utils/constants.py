@@ -6,6 +6,22 @@ class TaskType:
     TIME_BOUND = 5
     CHOICES = {1: 'DAILY',2: 'WEEKLY',3: 'MONTHLY',4: 'RANDOM',5: 'TIME_BOUND',}
 
+
+ # Active types (shown in UI)
+    ACTIVE_TYPES = [4, 5]
+
+    # Future types (UI placeholder only)
+    # FUTURE_TYPES = [1, 2, 3]
+
+    # Types where end_date is required
+    REQUIRES_END_DATE = [5]
+    # Future: [1, 2, 3, 5]
+
+    # Only TIME_BOUND stores actual times in datetime fields
+    REQUIRES_TIME = [5]
+
+
+    
 class PriorityType:
     LOW = 1
     MEDIUM = 2

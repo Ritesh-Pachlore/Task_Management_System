@@ -15,7 +15,7 @@ from .token_auth import generate_token
 
 class DevTokenView(APIView):
     """
-    GET /api/auth/dev-token/?emp_id=102201
+    GET /api/auth/dev-token/?emp_id=380988
     
     No password needed. Gets real name from staffmst.
     Generates JWT token valid for 24 hours.
@@ -26,7 +26,7 @@ class DevTokenView(APIView):
         "message": "Dev token generated for Amit Kumar",
         "data": {
             "token": "eyJ0eXAi...",
-            "user": {"emp_id": 102201, "full_name": "Amit Kumar"}
+            "user": {"emp_id": 380988, "full_name": "Ritesh Pachlore"}
         }
     }
     """
@@ -39,7 +39,7 @@ class DevTokenView(APIView):
             if not emp_id:
                 return error_response(
                     "emp_id parameter is required. "
-                    "Example: /api/auth/dev-token/?emp_id=102201"
+                    "Example: /api/auth/dev-token/?emp_id=380988"
                 )
 
             emp_id = int(emp_id)
@@ -102,15 +102,40 @@ class MeView(APIView):
 
 
 class EmployeeListView(APIView):
-    """GET /api/auth/employees/ — Real employees from staffmst"""
+    """
+    GET /api/auth/employees/              → All employees
+    GET /api/auth/employees/?search=rahul → Search by name
+    GET /api/auth/employees/?search=3809  → Search by ID
+    
+    Single search input works for BOTH ID and Name.
+    """
 
     def get(self, request):
         try:
-            result = call_sp('sp_get_employees', [request.user.emp_id])
-            return success_response(data=result)
+            search = request.query_params.get('search', '').strip()
+
+            if search:
+                # Search by ID or Name using single input
+                result = run_query(
+                    """
+                    SELECT
+                        EMP_ID AS emp_id,
+                        STF_FRNAME + ' ' + STF_LSNAME AS emp_name
+                    FROM inout_aems..staffmst
+                    WHERE
+                        CAST(EMP_ID AS NVARCHAR(20)) LIKE %s
+                        OR STF_FRNAME + ' ' + STF_LSNAME LIKE %s
+                    ORDER BY STF_FRNAME, STF_LSNAME
+                    """,
+                    [f'%{search}%', f'%{search}%']
+                )
+            else:
+                # No search — use existing SP
+                result = call_sp('sp_get_employees', [request.user.emp_id])
+
+            return success_response(data=result or [])
         except Exception as e:
             return error_response(message=str(e))
-
 
 
 
