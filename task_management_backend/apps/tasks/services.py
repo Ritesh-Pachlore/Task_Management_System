@@ -159,9 +159,9 @@ def get_task_history(execution_log_id):
     return call_sp('sp_get_task_history', [execution_log_id])
 
 
-def get_dashboard_counts(emp_id, view_type):
+def get_dashboard_counts(emp_id, view_type, date_from=None, date_to=None, employee_id=None):
     results = call_sp_multiple_results(
-        'sp_dashboard_counts', [emp_id, view_type])
+        'sp_dashboard_counts', [emp_id, view_type, date_from, date_to, employee_id])
     return {
         "view_type":        view_type,
         "overall_counts":   results[0][0] if len(results) > 0 and results[0] else {},
