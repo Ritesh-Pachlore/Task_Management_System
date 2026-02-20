@@ -5,7 +5,7 @@ No auto-shifting. Frontend asks permission first.
 """
 # apps/tasks/services.py
 
-from utils.db_helper import call_sp, call_sp_multiple_results
+from utils.db_helper import call_sp, call_sp_multiple_results,run_query
 from utils.constants import ActionType, TaskType
 from .notifications import (
     notify_task_assigned,
@@ -174,3 +174,25 @@ def get_dashboard_counts(emp_id, view_type):
 
 def get_affected_tasks(emp_id, view_type):
     return call_sp('sp_get_affected_tasks', [emp_id, view_type]) 
+
+
+
+def get_employees(emp_id, search=None):
+    if search:
+        return run_query(
+            """
+            SELECT
+                EMP_ID AS emp_id,
+                STF_FRNAME + ' ' + STF_LSNAME AS emp_name
+            FROM inout_aems..staffmst
+           WHERE
+                REP_STATUS = 1                             
+                AND (
+                    CAST(EMP_ID AS NVARCHAR(20)) LIKE %s
+                    OR STF_FRNAME + ' ' + STF_LSNAME LIKE %s
+                )
+            ORDER BY STF_FRNAME, STF_LSNAME
+            """,
+            [f'%{search}%', f'%{search}%']
+        )
+    return call_sp('sp_get_employees', [emp_id])

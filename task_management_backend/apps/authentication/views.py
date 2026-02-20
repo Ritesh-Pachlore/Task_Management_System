@@ -11,7 +11,7 @@ from rest_framework.permissions import AllowAny
 from utils.db_helper import call_sp, run_query
 from utils.response_handler import success_response, error_response
 from .token_auth import generate_token
-
+from apps.tasks.services import get_employees
 
 class DevTokenView(APIView):
     """
@@ -110,32 +110,44 @@ class EmployeeListView(APIView):
     Single search input works for BOTH ID and Name.
     """
 
+
+
     def get(self, request):
         try:
             search = request.query_params.get('search', '').strip()
-
-            if search:
-                # Search by ID or Name using single input
-                result = run_query(
-                    """
-                    SELECT
-                        EMP_ID AS emp_id,
-                        STF_FRNAME + ' ' + STF_LSNAME AS emp_name
-                    FROM inout_aems..staffmst
-                    WHERE
-                        CAST(EMP_ID AS NVARCHAR(20)) LIKE %s
-                        OR STF_FRNAME + ' ' + STF_LSNAME LIKE %s
-                    ORDER BY STF_FRNAME, STF_LSNAME
-                    """,
-                    [f'%{search}%', f'%{search}%']
-                )
-            else:
-                # No search — use existing SP
-                result = call_sp('sp_get_employees', [request.user.emp_id])
-
+            result = get_employees(
+                emp_id=request.user.emp_id,
+                search=search or None
+            )
             return success_response(data=result or [])
         except Exception as e:
             return error_response(message=str(e))
+    # def get(self, request):
+    #     try:
+    #         search = request.query_params.get('search', '').strip()
+
+    #         if search:
+    #             # Search by ID or Name using single input
+    #             result = run_query(
+    #                 """
+    #                 SELECT
+    #                     EMP_ID AS emp_id,
+    #                     STF_FRNAME + ' ' + STF_LSNAME AS emp_name
+    #                 FROM inout_aems..staffmst
+    #                 WHERE
+    #                     CAST(EMP_ID AS NVARCHAR(20)) LIKE %s
+    #                     OR STF_FRNAME + ' ' + STF_LSNAME LIKE %s
+    #                 ORDER BY STF_FRNAME, STF_LSNAME
+    #                 """,
+    #                 [f'%{search}%', f'%{search}%']
+    #             )
+    #         else:
+    #             # No search — use existing SP
+    #             result = call_sp('sp_get_employees', [request.user.emp_id])
+
+    #         return success_response(data=result or [])
+    #     except Exception as e:
+    #         return error_response(message=str(e))
 
 
 
