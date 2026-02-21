@@ -12,13 +12,14 @@ import {
 } from 'recharts';
 import {
     MdWarning, MdTrendingUp, MdAssignment,
-    MdCheckCircle, MdError, MdSchedule,
+    MdCheckCircle, MdError, MdSchedule,MdClose
 } from 'react-icons/md';
 
 const DashboardPage = () => {
     const [data,     setData]     = useState(null);
     const [viewType, setViewType] = useState('ASSIGNED_BY_ME');
     const [loading,  setLoading]  = useState(true);
+    const [showWarning, setShowWarning] = useState(true); // ← new state for holiday warning
     const navigate = useNavigate();
 
     // ← wrap with useCallback
@@ -76,33 +77,43 @@ const DashboardPage = () => {
             </div>
 
             {/* Holiday warning banner */}
-            {counts.holiday_affected_count > 0 && (
+             {showWarning && counts.holiday_affected_count > 0 && (
                 <div
-                    onClick={() => navigate('/affected-tasks')}
                     style={{
                         background: '#FFF3E0',
                         border: '1px solid #FFE0B2',
                         borderRadius: 12,
                         padding: '14px 20px',
                         marginBottom: 20,
-                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'space-between',
                         gap: 12,
+                        cursor: 'pointer',
                     }}
                 >
-                    <MdWarning style={{ fontSize: 24, color: '#FF9800' }} />
-                    <span style={{ fontSize: 14 }}>
-                        <strong>
-                            {counts.holiday_affected_count} task(s)
-                        </strong>
-                        {' '}have deadlines on holidays/Sundays.
-                        <span style={{ color: '#4361ee' }}>
-                            {' '}Click to review →
+                    <div
+                        onClick={() => navigate('/affected-tasks')}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}
+                    >
+                        <MdWarning style={{ fontSize: 24, color: '#FF9800' }} />
+                        <span style={{ fontSize: 14 }}>
+                            <strong>{counts.holiday_affected_count} task(s)</strong> have deadlines on holidays/Sundays.
+                            <span style={{ color: '#4361ee' }}> Click to review →</span>
                         </span>
-                    </span>
+                    </div>
+
+                    {/* Close button */}
+                    <MdClose
+                        style={{ fontSize: 20, color: '#FF5722', cursor: 'pointer' }}
+                        onClick={(e) => {
+                            e.stopPropagation(); // prevent navigate click
+                            setShowWarning(false);
+                        }}
+                    />
                 </div>
             )}
+
 
             {/* Stats cards */}
             <div className="stats-grid">

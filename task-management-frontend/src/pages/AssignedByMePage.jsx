@@ -1,3 +1,4 @@
+// src/pages/AssignedByMePage.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
@@ -46,9 +47,19 @@ const AssignedByMePage = () => {
                 title: 'Extend Deadline',
                 showDate: true,
             });
+        } else if (actionType === 'edit') {
+            setActionModal({
+                task,
+                actionType: 'edit',
+                title: 'Edit Task',
+                showDate: false,
+            });
         } else {
             const titles = {
-                3: 'Approve Task', 4: 'Reject Task', 6: 'Cancel Task', 7: 'Put On Hold',
+                3: 'Approve Task',
+                4: 'Reject Task',
+                6: 'Cancel Task',
+                7: 'Put On Hold',
             };
             setActionModal({
                 task,
@@ -58,15 +69,31 @@ const AssignedByMePage = () => {
         }
     };
 
-    const submitAction = async ({ remarks, extended_date }) => {
+    const submitAction = async ({ remarks, extended_date, title, description }) => {
         try {
+            if (actionModal.actionType === 'edit') {
+                const response = await api.post('/tasks/edit/', {
+                    execution_log_id: actionModal.task.execution_log_id,
+                    title,
+                    description,
+                    deadline: extended_date,
+                });
+                if (response.data.success) {
+                    toast.success('Task updated successfully!');
+                    setActionModal(null);
+                    fetchTasks();
+                } else {
+                    toast.error(response.data.message);
+                }
+                return;
+            }
+
             if (actionModal.actionType === 'extend') {
                 if (!extended_date) {
                     toast.error('Please select a date');
                     return;
                 }
 
-                // Check if date is holiday
                 const checkResponse = await api.get(
                     `/tasks/check-date/?date=${extended_date}`
                 );
@@ -82,7 +109,6 @@ const AssignedByMePage = () => {
                     return;
                 }
 
-                // Date is fine — extend directly
                 const response = await api.post('/tasks/extend/', {
                     execution_log_id: actionModal.task.execution_log_id,
                     extended_date,
@@ -180,6 +206,7 @@ const AssignedByMePage = () => {
                     showDate={actionModal.showDate}
                     onSubmit={submitAction}
                     onClose={() => setActionModal(null)}
+                    actionModal={actionModal}
                 />
             )}
 

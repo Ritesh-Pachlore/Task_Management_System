@@ -1,6 +1,6 @@
 // src/pages/CreateTaskPage.jsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useRef} from 'react';
 import { useNavigate }    from 'react-router-dom';
 import api                from '../api/axios';
 import { toast }          from 'react-toastify';
@@ -97,16 +97,30 @@ const INITIAL_FORM = {
 
 const CreateTaskPage = () => {
     const navigate = useNavigate();
+    const dropdownRef = useRef(null);
 
     const [form,        setForm]        = useState(INITIAL_FORM);
     const [employees,   setEmployees]   = useState([]);
     const [empSearch,   setEmpSearch]   = useState('');
     const [empLoading,  setEmpLoading]  = useState(false);
     const [submitting,  setSubmitting]  = useState(false);
+     const [showEmpList, setShowEmpList] = useState(false);
 
     // Date shift modal state
     const [shiftInfo,   setShiftInfo]   = useState(null);
     const [shiftTarget, setShiftTarget] = useState('');   // 'task_start_date' | 'task_end_date'
+
+
+    // 🔥 Fetch employees ONLY when dropdown is open
+    useEffect(() => {
+        if (!showEmpList) return;
+
+        const timer = setTimeout(() => {
+            fetchEmployees(empSearch);
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [empSearch, showEmpList]);
 
     // ── Load employees — debounced on search change ──────────────
     useEffect(() => {
@@ -115,6 +129,22 @@ const CreateTaskPage = () => {
         }, 300);
         return () => clearTimeout(timer);
     }, [empSearch]);
+
+    // 🔥 Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (
+                dropdownRef.current &&
+                !dropdownRef.current.contains(event.target)
+            ) {
+                setShowEmpList(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () =>
+            document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const fetchEmployees = async (search = '') => {
         setEmpLoading(true);
@@ -380,6 +410,8 @@ const CreateTaskPage = () => {
                                 </button>
                             ))}
 
+                            
+
                             {/* ── FUTURE placeholder buttons ────────────────────
                                 Uncomment when Daily/Weekly/Monthly are ready.
                                 These are UI-only, no backend currently.
@@ -415,45 +447,7 @@ const CreateTaskPage = () => {
         
                     </div>
 
-                    {/* ══════════════════════════════════════════
-                        SECTION 3: Priority toggle buttons
-                    ══════════════════════════════════════════ */}
-                    <div className="form-group">
-                        <label className="form-label">
-                            Priority <span className="req">*</span>
-                        </label>
-                        <div className="toggle-group">
-                            {PRIORITIES.map(p => {
-                                const isActive = form.priority_type === p.value;
-                                return (
-                                    <button
-                                        key={p.value}
-                                        type="button"
-                                        className={`toggle-btn priority-btn ${
-                                            isActive ? 'priority-btn-active' : ''
-                                        }`}
-                                        style={isActive
-                                            ? { background: p.color,
-                                                borderColor: p.color,
-                                                color: 'white' }
-                                            : { borderColor: p.color,
-                                                color: p.color,
-                                                background: p.bg }
-                                        }
-                                        onClick={() => setField('priority_type', p.value)}
-                                    >
-                                        {p.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* ══════════════════════════════════════════
-                        SECTION 4: Conditional Date/Time Fields
-                        (changes based on task_type)
-                    ══════════════════════════════════════════ */}
-
+                    
                     {/* ── RANDOM (4): Start Date only ─────────── */}
                     {form.task_type === 4 && (
                         <div className="form-group">
@@ -548,7 +542,7 @@ const CreateTaskPage = () => {
                             </div>
 
                             {/* Live preview of what will be stored */}
-                            {form.task_start_date && form.start_time &&
+                            {/* {form.task_start_date && form.start_time &&
                              form.task_end_date && form.end_time && (
                                 <div className="datetime-preview">
                                     <span>💾 Will save:</span>
@@ -560,9 +554,49 @@ const CreateTaskPage = () => {
                                         {form.task_end_date} {form.end_time}:00
                                     </code>
                                 </div>
-                            )}
+                            )} */}
                         </>
                     )}
+
+
+                    {/* ══════════════════════════════════════════
+                        SECTION 3: Priority toggle buttons
+                    ══════════════════════════════════════════ */}
+                    <div className="form-group">
+                        <label className="form-label">
+                            Priority <span className="req">*</span>
+                        </label>
+                        <div className="toggle-group">
+                            {PRIORITIES.map(p => {
+                                const isActive = form.priority_type === p.value;
+                                return (
+                                    <button
+                                        key={p.value}
+                                        type="button"
+                                        className={`toggle-btn priority-btn ${
+                                            isActive ? 'priority-btn-active' : ''
+                                        }`}
+                                        style={isActive
+                                            ? { background: p.color,
+                                                borderColor: p.color,
+                                                color: 'white' }
+                                            : { borderColor: p.color,
+                                                color: p.color,
+                                                background: p.bg }
+                                        }
+                                        onClick={() => setField('priority_type', p.value)}
+                                    >
+                                        {p.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* ══════════════════════════════════════════
+                        SECTION 4: Conditional Date/Time Fields
+                        (changes based on task_type)
+                    ══════════════════════════════════════════ */}
 
                     {/* ── FUTURE: DAILY (1) ───────────────────────
                     {form.task_type === 1 && (
@@ -627,98 +661,85 @@ const CreateTaskPage = () => {
                         SECTION 5: Employee Assignment
                         Search by ID or Name (single input)
                     ══════════════════════════════════════════ */}
-                    <div className="form-group">
+                    
+                    <div className="form-group" ref={dropdownRef}>
                         <label className="form-label">
                             Assign To <span className="req">*</span>
-                            {form.selectedEmployees.length > 0 && (
-                                <span className="selected-count">
-                                    {form.selectedEmployees.length} selected
-                                </span>
-                            )}
                         </label>
 
-                        {/* Search input */}
                         <div className="search-wrap">
                             <span className="search-icon">🔍</span>
                             <input
                                 type="text"
                                 className="search-input"
-                                placeholder="Type Employee ID or Name to search..."
+                                placeholder="Search employee..."
                                 value={empSearch}
-                                onChange={e => setEmpSearch(e.target.value)}
+                                onFocus={() => setShowEmpList(true)}
+                                onChange={e =>
+                                    setEmpSearch(e.target.value)
+                                }
                             />
-                            {empSearch && (
-                                <button
-                                    type="button"
-                                    className="search-clear"
-                                    onClick={() => setEmpSearch('')}
-                                    title="Clear search"
-                                >
-                                    ×
-                                </button>
-                            )}
                         </div>
 
-                        {/* Employee list box */}
-                        <div className="emp-list-box">
-                            {empLoading ? (
-                                /* Loading state */
-                                <div className="emp-list-state">
-                                    <div className="spinner"
-                                         style={{ width: 22, height: 22 }} />
-                                    <span>Loading employees...</span>
-                                </div>
-                            ) : employees.length === 0 ? (
-                                /* Empty state */
-                                <div className="emp-list-state">
-                                    {empSearch
-                                        ? `No employee found matching "${empSearch}"`
-                                        : 'No employees available'}
-                                </div>
-                            ) : (
-                                /* Employee rows */
-                                employees.map(emp => {
-                                    const isChecked =
-                                        form.selectedEmployees.includes(emp.emp_id);
-                                    return (
-                                        <label
-                                            key={emp.emp_id}
-                                            className={`emp-row ${
-                                                isChecked ? 'emp-row-checked' : ''
-                                            }`}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={isChecked}
-                                                onChange={() => toggleEmployee(emp.emp_id)}
-                                            />
-                                            <span className="emp-row-name">
-                                                {emp.emp_name}
-                                            </span>
-                                            <span className="emp-row-id">
-                                                #{emp.emp_id}
-                                            </span>
-                                        </label>
-                                    );
-                                })
-                            )}
-                        </div>
+                        {showEmpList && (
+                            <div className="emp-list-box">
+                                {empLoading ? (
+                                    <div className="emp-list-state">
+                                        Loading employees...
+                                    </div>
+                                ) : employees.length === 0 ? (
+                                    <div className="emp-list-state">
+                                        No employees found
+                                    </div>
+                                ) : (
+                                    employees.map(emp => {
+                                        const isChecked =
+                                            form.selectedEmployees.includes(
+                                                emp.emp_id
+                                            );
 
-                        {/* Selected employee chips */}
+                                        return (
+                                            <label
+                                                key={emp.emp_id}
+                                                className={`emp-row ${
+                                                    isChecked
+                                                        ? 'emp-row-checked'
+                                                        : ''
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() =>
+                                                        toggleEmployee(
+                                                            emp.emp_id
+                                                        )
+                                                    }
+                                                />
+                                                <span>
+                                                    {emp.emp_name}
+                                                </span>
+                                            </label>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        )}
+
                         {form.selectedEmployees.length > 0 && (
                             <div className="chips-wrap">
-                                {form.selectedEmployees.map(empId => {
+                                {form.selectedEmployees.map(id => {
                                     const emp = employees.find(
-                                        e => e.emp_id === empId);
+                                        e => e.emp_id === id
+                                    );
                                     return (
-                                        <span key={empId} className="chip">
-                                            <span>
-                                                {emp?.emp_name || `#${empId}`}
-                                            </span>
+                                        <span key={id} className="chip">
+                                            {emp?.emp_name || id}
                                             <button
                                                 type="button"
-                                                onClick={() => toggleEmployee(empId)}
-                                                title="Remove"
+                                                onClick={() =>
+                                                    toggleEmployee(id)
+                                                }
                                             >
                                                 ×
                                             </button>
