@@ -71,7 +71,7 @@ const MyTasksPage = () => {
                 <h1>My Tasks</h1>
             </div>
 
-            <TaskFilters filters={filters} setFilters={setFilters} />
+            <TaskFilters filters={filters} setFilters={setFilters} showDateFilter={true} />
 
             {loading ? (
                 <div className="loading-container"><div className="spinner" /></div>

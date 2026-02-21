@@ -154,7 +154,7 @@ const AssignedByMePage = () => {
                 <h1>Assigned By Me</h1>
             </div>
 
-            <TaskFilters filters={filters} setFilters={setFilters} showEmployeeFilter />
+            <TaskFilters filters={filters} setFilters={setFilters} showEmployeeFilter showDateFilter={true} />
 
             {loading ? (
                 <div className="loading-container"><div className="spinner" /></div>
