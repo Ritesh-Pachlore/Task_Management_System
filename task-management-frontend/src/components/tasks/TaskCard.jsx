@@ -1,3 +1,4 @@
+// src/components/tasks/TaskCard.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../common/StatusBadge';
@@ -12,7 +13,6 @@ const TaskCard = ({ task, viewType, onAction }) => {
     const isOverdue = task.is_overdue === 1 || task.is_overdue === true;
     const daysText = getDaysText(task.days_remaining);
 
-    // Determine which buttons to show
     const getActions = () => {
         const status = task.status;
         const actions = [];
@@ -25,6 +25,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
         }
 
         if (viewType === 'ASSIGNED_BY_ME') {
+            // Manager actions
             if (status === 2 || status === 5) {
                 actions.push({ type: 3, label: 'Approve', cls: 'btn-success' });
                 actions.push({ type: 4, label: 'Reject', cls: 'btn-danger' });
@@ -33,10 +34,15 @@ const TaskCard = ({ task, viewType, onAction }) => {
                 actions.push({ type: 'extend', label: 'Extend', cls: 'btn-warning' });
                 actions.push({ type: 6, label: 'Cancel', cls: 'btn-outline' });
             }
+            // NEW: Edit button added
+            actions.push({ type: 'edit', label: 'Edit', cls: 'btn-info' });
         }
 
         return actions;
     };
+
+    const editAction = getActions().find(a => a.type === 'edit');
+    const otherActions = getActions().filter(a => a.type !== 'edit');
 
     return (
         <div className={`task-card ${isOverdue ? 'task-card-overdue' : ''}`}>
@@ -45,8 +51,16 @@ const TaskCard = ({ task, viewType, onAction }) => {
                     <PriorityBadge priority={task.priority_type} />
                     <StatusBadge status={task.status} />
                 </div>
-                {task.extended_date && (
-                    <span className="task-extended-tag">Extended</span>
+                {task.extended_date && <span className="task-extended-tag">Extended</span>}
+
+                {/* Edit button top-right */}
+                {editAction && (
+                    <button
+                        className="task-edit-btn"
+                        onClick={() => onAction(task, editAction.type)}
+                    >
+                        {editAction.label}
+                    </button>
                 )}
             </div>
 
@@ -79,25 +93,28 @@ const TaskCard = ({ task, viewType, onAction }) => {
                 </div>
             </div>
 
-            <div className="task-card-actions">
-                <div className="btn-group">
-                    {getActions().map((action, idx) => (
+            {/* Other actions at the bottom */}
+            {otherActions.length > 0 && (
+                <div className="task-card-actions">
+                    <div className="btn-group">
+                        {otherActions.map((action, idx) => (
+                            <button
+                                key={idx}
+                                className={`btn btn-sm ${action.cls}`}
+                                onClick={() => onAction(task, action.type)}
+                            >
+                                {action.label}
+                            </button>
+                        ))}
                         <button
-                            key={idx}
-                            className={`btn btn-sm ${action.cls}`}
-                            onClick={() => onAction(task, action.type)}
+                            className="btn btn-sm btn-outline"
+                            onClick={() => navigate(`/task/${task.execution_log_id}`)}
                         >
-                            {action.label}
+                            <MdHistory /> History
                         </button>
-                    ))}
-                    <button
-                        className="btn btn-sm btn-outline"
-                        onClick={() => navigate(`/task/${task.execution_log_id}`)}
-                    >
-                        <MdHistory /> History
-                    </button>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };
