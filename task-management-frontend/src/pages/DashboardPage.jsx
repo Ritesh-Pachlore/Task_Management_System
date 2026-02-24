@@ -42,17 +42,31 @@ const DashboardPage = () => {
             if (selectedEmp && viewType === 'ASSIGNED_BY_ME')
                 params.set('employee_id', selectedEmp);
 
-            const response = await api.get(`/tasks/dashboard/?${params.toString()}`);
+            const url = `/tasks/dashboard/?${params.toString()}`;
+            console.log(`🔄 Fetching dashboard data from: ${url}`);
+            
+            const response = await api.get(url);
+            
             if (response.data.success) {
                 const d = response.data.data;
+                console.log('✅ Dashboard data loaded successfully:', d);
                 setData(d);
                 // Build employee list from summary only on unfiltered first load
                 if (!selectedEmp && d.employee_summary?.length) {
                     employeeListRef.current = d.employee_summary;
                 }
+            } else {
+                console.error('❌ API returned success=false:', response.data);
+                toast.error(response.data.message || 'Failed to load dashboard');
             }
         } catch (error) {
-            toast.error('Failed to load dashboard');
+            console.error('❌ Error fetching dashboard:', {
+                status: error.response?.status,
+                message: error.response?.data?.message || error.message,
+                details: error.response?.data,
+                url: error.config?.url,
+            });
+            toast.error('Failed to load dashboard: ' + (error.response?.data?.message || error.message));
         }
         setLoading(false);
     }, [viewType, dateFrom, dateTo, selectedEmp]);
@@ -75,15 +89,27 @@ const DashboardPage = () => {
             else if (label === 'Approved') params.set('status', 3);
             else if (label === 'Overdue') params.set('overdue_only', 1);
 
-            const response = await api.get(`${endpoint}?${params.toString()}`);
+            const url = `${endpoint}?${params.toString()}`;
+            console.log(`🔄 Fetching filtered tasks from: ${url}`, { label, viewType });
+            
+            const response = await api.get(url);
             if (response.data.success) {
+                console.log(`✅ Filtered tasks loaded for "${label}":`, response.data.data);
                 setFilteredTasks(response.data.data || []);
+            } else {
+                console.error(`❌ Failed to fetch "${label}" tasks:`, response.data);
+                toast.error(response.data.message || 'Failed to load tasks');
             }
         } catch (error) {
-            toast.error('Failed to load filtered tasks');
+            console.error(`❌ Error fetching "${label}" tasks:`, {
+                status: error.response?.status,
+                message: error.response?.data?.message || error.message,
+                details: error.response?.data,
+            });
+            toast.error('Failed to load tasks: ' + (error.response?.data?.message || error.message));
         }
         setFilteredLoading(false);
-    }, [viewType, selectedEmp, dateFrom, dateTo]);
+    }, [viewType, dateFrom, dateTo, selectedEmp]);
 
     useEffect(() => {
         fetchDashboard();
@@ -243,7 +269,7 @@ const DashboardPage = () => {
                                             key={emp.emp_id}
                                             style={{
                                                 padding: '8px 12px', cursor: 'pointer', fontSize: 14,
-                                                background: selectedEmp == emp.emp_id ? '#f0f3ff' : 'transparent'
+                                                background: selectedEmp === emp.emp_id ? '#f0f3ff' : 'transparent'
                                             }}
                                             onClick={() => {
                                                 setSelectedEmp(emp.emp_id);
