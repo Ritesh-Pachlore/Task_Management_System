@@ -119,6 +119,20 @@ const DashboardPage = () => {
 
     const counts = data.overall_counts || {};
 
+    const getDeptName = (item) => {
+        if (!item) return '';
+        const candidates = [
+            item.emp_department,
+            item.department,
+            item.department_name,
+            item.dept_name,
+            item.dep_name,
+            item.dept,
+        ];
+        const found = candidates.find(c => c && c !== 'N/A');
+        return found || '';
+    };
+
     const statsCards = [
         { label: 'Total', value: counts.total_tasks, icon: <MdAssignment />, color: '#4361ee' },
         { label: 'In Progress', value: counts.in_progress_count, icon: <MdTrendingUp />, color: '#2196F3' },
@@ -252,7 +266,7 @@ const DashboardPage = () => {
                                                 setSelectedLabel(null);
                                             }}
                                         >
-                                            {emp.emp_name}{emp.emp_department ? ` — ${emp.emp_department}` : ''}
+                                            {emp.emp_name}{getDeptName(emp) ? ` — ${getDeptName(emp)}` : ''}
                                         </div>
                                     ))}
                             </div>
@@ -409,7 +423,7 @@ const DashboardPage = () => {
                                                         >
                                                             {task.emp_name || 'Unassigned'}
                                                         </td>
-                                                            <td>{task.emp_department || 'N/A'}</td>
+                                                            <td>{getDeptName(task) || 'N/A'}</td>
                                                         <td>{task.task_title}</td>
                                                         <td style={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                             {task.task_description}
@@ -542,7 +556,7 @@ const DashboardPage = () => {
                                                 >
                                                     {emp.emp_name}
                                                 </td>
-                                                <td>{emp.emp_department || 'N/A'}</td>
+                                                <td>{getDeptName(emp) || 'N/A'}</td>
                                                 <td>{emp.total_tasks}</td>
                                             <td style={{ color: '#4CAF50' }}>
                                                 {emp.completed}

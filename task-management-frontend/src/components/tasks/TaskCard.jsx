@@ -48,8 +48,8 @@ const TaskCard = ({ task, viewType, onAction }) => {
     return (
         <div
             className={`task-card ${isOverdue ? 'task-card-overdue' : ''}`}
-            onClick={() => navigate(`/task/${task.execution_log_id}`)}
-            style={{ cursor: 'pointer' }}
+            // onClick={() => navigate(`/task/${task.execution_log_id}`)}
+            // style={{ cursor: 'pointer' }}
         >
             <div className="task-card-top">
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -103,28 +103,30 @@ const TaskCard = ({ task, viewType, onAction }) => {
                 </div>
             </div>
 
-            {/* Other actions at the bottom */}
-            {otherActions.length > 0 && (
-                <div className="task-card-actions">
-                    <div className="btn-group">
-                        {otherActions.map((action, idx) => (
-                            <button
-                                key={idx}
-                                className={`btn btn-sm ${action.cls}`}
-                                onClick={(e) => { e.stopPropagation(); onAction(task, action.type); }}
-                            >
-                                {action.label}
-                            </button>
-                        ))}
-                        <button
-                            className="btn btn-sm btn-outline"
-                            onClick={(e) => { e.stopPropagation(); navigate(`/task/${task.execution_log_id}`); }}
-                        >
-                            <MdHistory /> History
-                        </button>
-                    </div>
-                </div>
-            )}
+            <div className="task-card-actions">
+    <div className="btn-group">
+        {otherActions.map((action, idx) => (
+            <button
+                key={idx}
+                className={`btn btn-sm ${action.cls}`}
+                onClick={(e) => { e.stopPropagation(); onAction(task, action.type); }}
+            >
+                {action.label}
+            </button>
+        ))}
+
+        {/* Always visible History button */}
+        <button
+            className="btn btn-sm btn-outline"
+            onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/task/${task.execution_log_id}`);
+            }}
+        >
+            <MdHistory /> History
+        </button>
+    </div>
+</div>
         </div>
     );
 };

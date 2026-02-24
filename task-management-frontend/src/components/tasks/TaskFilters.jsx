@@ -2,7 +2,7 @@ import React from 'react';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../../utils/constants';
 import { MdSearch, MdFilterList } from 'react-icons/md';
 
-const TaskFilters = ({ filters, setFilters, showEmployeeFilter = false }) => {
+const TaskFilters = ({ filters, setFilters, showEmployeeFilter = false,showDateFilter = true}) => {
     const updateFilter = (key, value) => {
         setFilters(prev => ({ ...prev, [key]: value }));
     };
@@ -30,6 +30,48 @@ const TaskFilters = ({ filters, setFilters, showEmployeeFilter = false }) => {
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
             </select>
+
+             {showDateFilter && (
+    <div style={{ 
+        display: 'flex', 
+        gap: '16px', 
+        alignItems: 'flex-end' 
+    }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <label style={{ fontSize: 12, marginBottom: 4, color: '#555' }}>
+                Start Date
+            </label>
+            <input
+                type="date"
+                value={filters.date_from || ''}
+                onChange={(e) => updateFilter('date_from', e.target.value)}
+                style={{
+                    padding: '6px 8px',
+                    border: '1px solid #ddd',
+                    borderRadius: 6,
+                    fontSize: 13
+                }}
+            />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <label style={{ fontSize: 12, marginBottom: 4, color: '#555' }}>
+                End Date
+            </label>
+            <input
+                type="date"
+                value={filters.date_to || ''}
+                onChange={(e) => updateFilter('date_to', e.target.value)}
+                style={{
+                    padding: '6px 8px',
+                    border: '1px solid #ddd',
+                    borderRadius: 6,
+                    fontSize: 13
+                }}
+            />
+        </div>
+    </div>
+)}
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}>
                 <input

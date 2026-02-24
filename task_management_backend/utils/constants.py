@@ -36,9 +36,9 @@ class TaskStatus:
     REJECTED = 4
     RESUBMITTED = 5
     CANCELLED = 6
-    ON_HOLD = 7
+    
     CHOICES = {0:"ASSIGNED",1:"STARTED",2:"SUBMITTED",3:"APPROVED",
-               4:"REJECTED",5:"RESUBMITTED",6:"CANCELLED",7:"ON_HOLD"}
+               4:"REJECTED",5:"RESUBMITTED",6:"CANCELLED",}
     
 
 class ActionType:
@@ -49,10 +49,10 @@ class ActionType:
     REJECTED = 4
     RESUBMITTED = 5
     CANCELLED = 6
-    ON_HOLD = 7
-    EXTENDED = 8
+    # ON_HOLD = 7
+    EXTENDED = 7
     CHOICES = {0:"ASSIGNED",1:"STARTED",2:"SUBMITTED",3:"APPROVED",
-               4:"REJECTED",5:"RESUBMITTED",6:"CANCELLED",7:"ON_HOLD",8:"EXTENDED"}
+               4:"REJECTED",5:"RESUBMITTED",6:"CANCELLED",7:"EXTENDED"}
     
 
 class ViewType:

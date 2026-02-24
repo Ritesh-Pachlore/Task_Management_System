@@ -162,10 +162,34 @@ def get_task_history(execution_log_id):
 def get_dashboard_counts(emp_id, view_type, date_from=None, date_to=None, employee_id=None):
     results = call_sp_multiple_results(
         'sp_dashboard_counts', [emp_id, view_type, date_from, date_to, employee_id])
+    overall = results[0][0] if len(results) > 0 and results[0] else {}
+    employee_summary = results[1] if len(results) > 1 and results[1] else []
+
+    # Enrich employee_summary: if department is missing or 'N/A', try a direct lookup
+    if employee_summary:
+        for emp in employee_summary:
+            dep = emp.get('emp_department') if emp else None
+            if not dep or dep == 'N/A':
+                try:
+                    q = """
+                        SELECT d.DEP_NAME AS dep_name
+                        FROM inout_aems..staffmst s
+                        LEFT JOIN inout_aems..deptmst d ON s.DEP_ID = d.DEP_ID
+                        WHERE s.EMP_ID = %s
+                    """
+                    res = run_query(q, [emp.get('emp_id')])
+                    if res and res[0].get('dep_name'):
+                        emp['emp_department'] = res[0]['dep_name']
+                    else:
+                        emp['emp_department'] = None
+                except Exception:
+                    # best-effort: leave as-is if lookup fails
+                    pass
+
     return {
         "view_type":        view_type,
-        "overall_counts":   results[0][0] if len(results) > 0 and results[0] else {},
-        "employee_summary": results[1]    if len(results) > 1 and results[1] else [],
+        "overall_counts":   overall,
+        "employee_summary": employee_summary,
         "status_chart":     results[2]    if len(results) > 2 and results[2] else [],
         "priority_chart":   results[3]    if len(results) > 3 and results[3] else [],
         "monthly_trend":    results[4]    if len(results) > 4 and results[4] else [],
