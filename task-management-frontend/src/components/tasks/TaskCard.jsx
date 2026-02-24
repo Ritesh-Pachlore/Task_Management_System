@@ -93,28 +93,26 @@ const TaskCard = ({ task, viewType, onAction }) => {
                 </div>
             </div>
 
-            {/* Other actions at the bottom */}
-            {otherActions.length > 0 && (
-                <div className="task-card-actions">
-                    <div className="btn-group">
-                        {otherActions.map((action, idx) => (
-                            <button
-                                key={idx}
-                                className={`btn btn-sm ${action.cls}`}
-                                onClick={() => onAction(task, action.type)}
-                            >
-                                {action.label}
-                            </button>
-                        ))}
+            {/* Other actions at the bottom - always show History button */}
+            <div className="task-card-actions">
+                <div className="btn-group">
+                    {otherActions.map((action, idx) => (
                         <button
-                            className="btn btn-sm btn-outline"
-                            onClick={() => navigate(`/task/${task.execution_log_id}`)}
+                            key={idx}
+                            className={`btn btn-sm ${action.cls}`}
+                            onClick={() => onAction(task, action.type)}
                         >
-                            <MdHistory /> History
+                            {action.label}
                         </button>
-                    </div>
+                    ))}
+                    <button
+                        className="btn btn-sm btn-outline"
+                        onClick={() => navigate(`/task/${task.execution_log_id}`)}
+                    >
+                        <MdHistory /> History
+                    </button>
                 </div>
-            )}
+            </div>
         </div>
     );
 };
