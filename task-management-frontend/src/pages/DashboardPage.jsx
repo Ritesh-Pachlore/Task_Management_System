@@ -147,6 +147,7 @@ const DashboardPage = () => {
 
     const statsCards = [
         { label: 'Total', value: counts.total_tasks, icon: <MdAssignment />, color: '#4361ee' },
+        { label: 'Pending', value: counts.pending_count, icon: <MdSchedule />, color: '#FF9800' },
         { label: 'In Progress', value: counts.in_progress_count, icon: <MdTrendingUp />, color: '#2196F3' },
         { label: 'Submitted', value: counts.submitted_count, icon: <MdSchedule />, color: '#FF9800' },
         { label: 'Approved', value: counts.approved_count, icon: <MdCheckCircle />, color: '#4CAF50' },

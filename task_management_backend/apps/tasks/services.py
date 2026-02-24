@@ -73,12 +73,17 @@ def create_task(task_data, created_by, created_by_name=""):
         task_data.get('task_description', ''),
         task_type,
         int(task_data['priority_type']),
-        task_data['task_start_date'],    # DATE string  e.g. "2025-07-15"
-        start_time,                      # TIME string  e.g. "09:00" or None
-        task_data['task_end_date'],      # DATE string  e.g. "2025-07-15"
-        end_time,                        # TIME string  e.g. "09:30" or None
+        task_data['task_start_date'],    # DATE string 
+        start_time,                      # TIME string or None
+        task_data['task_end_date'],      # DATE string
+        end_time,                        # TIME string or None
         created_by,
         task_data['emp_list'],
+        # New Recurrence params
+        task_data.get('recurrence_type'),
+        task_data.get('recurrence_end_date'),
+        task_data.get('weekly_days'),
+        task_data.get('monthly_day_of_month'),
     ])
 
     if result and result[0].get('success') == 1:
