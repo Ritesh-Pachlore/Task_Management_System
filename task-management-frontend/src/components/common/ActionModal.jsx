@@ -1,19 +1,66 @@
 // src/components/common/ActionModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import api from '../../api/axios';
+import { toast } from 'react-toastify';
 
 const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }) => {
     const [remarks, setRemarks] = useState('');
     const [extendedDate, setExtendedDate] = useState('');
     const [taskTitle, setTaskTitle] = useState('');
     const [taskDescription, setTaskDescription] = useState('');
+    const [employees, setEmployees] = useState([]);
+    const [empSearch, setEmpSearch] = useState('');
+    const [empLoading, setEmpLoading] = useState(false);
+    const [selectedEmployees, setSelectedEmployees] = useState([]);
+    const [showEmpList, setShowEmpList] = useState(false);
+    const empListRef = useRef(null);
+    const empInputRef = useRef(null);
 
     useEffect(() => {
         if (actionModal?.actionType === 'edit' && actionModal.task) {
             setTaskTitle(actionModal.task.task_title || '');
             setTaskDescription(actionModal.task.task_description || '');
             setExtendedDate(actionModal.task.effective_deadline || '');
+            // pre-select existing assigned emp if available
+            const assigned = actionModal.task.emp_list || actionModal.task.assigned_emp_list || '';
+            if (assigned) {
+                const arr = String(assigned).split(',').map(s => parseInt(s)).filter(Boolean);
+                setSelectedEmployees(arr);
+            }
+            // pre-load employee list so previous assignees' names can be shown
+            fetchEmployees('');
         }
     }, [actionModal]);
+
+    useEffect(() => {
+        if (actionModal?.actionType !== 'edit') return;
+        const timer = setTimeout(() => fetchEmployees(empSearch), 250);
+        return () => clearTimeout(timer);
+    }, [empSearch, actionModal]);
+
+    // Close employee list when clicking outside the input/list
+    useEffect(() => {
+        const handler = (e) => {
+            if (!showEmpList) return;
+            if (empListRef.current && empListRef.current.contains(e.target)) return;
+            if (empInputRef.current && empInputRef.current.contains(e.target)) return;
+            setShowEmpList(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showEmpList]);
+
+    const fetchEmployees = async (search = '') => {
+        setEmpLoading(true);
+        try {
+            const params = search ? `?search=${encodeURIComponent(search)}` : '';
+            const res = await api.get(`/auth/employees/${params}`);
+            if (res.data.success) setEmployees(res.data.data || []);
+        } catch (e) {
+            toast.error('Could not load employees');
+        }
+        setEmpLoading(false);
+    };
 
     const handleSubmit = () => {
         onSubmit({
@@ -21,6 +68,7 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
             extended_date: extendedDate,
             title: taskTitle,
             description: taskDescription,
+            emp_list: selectedEmployees.length > 0 ? selectedEmployees.join(',') : undefined,
         });
     };
 
@@ -34,15 +82,69 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
 
                 {actionModal?.actionType === 'edit' && (
                     <>
+                        {/* Previously assigned */}
                         <div className="form-group">
-                            <label>Title</label>
+                            <label>Previously assigned to</label>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                {(() => {
+                                    const t = actionModal.task || {};
+                                    if (t.emp_names) return String(t.emp_names).split(',').map((n, i) => (<span key={i} className="chip">{n.trim()}</span>));
+                                    if (t.emp_name) return (<span className="chip">{t.emp_name}</span>);
+                                    return selectedEmployees.map(id => {
+                                        const e = employees.find(x => x.emp_id === id);
+                                        return (<span key={id} className="chip">{e ? e.emp_name : id}</span>);
+                                    });
+                                })()}
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Add/Remove Employees</label>
                             <input
+                                ref={empInputRef}
                                 type="text"
                                 className="form-control"
-                                value={taskTitle}
-                                onChange={(e) => setTaskTitle(e.target.value)}
-                                placeholder="Task title"
+                                placeholder="Search employees to add..."
+                                value={empSearch}
+                                onFocus={() => setShowEmpList(true)}
+                                onChange={(e) => { setEmpSearch(e.target.value); setShowEmpList(true); }}
                             />
+
+                            {/* Selected employees shown immediately */}
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                                {selectedEmployees.map(id => {
+                                    const e = employees.find(x => x.emp_id === id);
+                                    return (
+                                        <span key={id} className="chip">{e ? e.emp_name : id}</span>
+                                    );
+                                })}
+                            </div>
+
+                            {showEmpList && (
+                                <div ref={empListRef} style={{ maxHeight: 200, overflowY: 'auto', marginTop: 8, border: '1px solid #eee', padding: 6, borderRadius: 6 }}>
+                                    {empLoading ? (
+                                        <div style={{ padding: 8 }}>Loading...</div>
+                                    ) : employees.length === 0 ? (
+                                        <div style={{ padding: 8, color: '#999' }}>No employees</div>
+                                    ) : (
+                                        employees.map(emp => {
+                                            const checked = selectedEmployees.includes(emp.emp_id);
+                                            return (
+                                                <label key={emp.emp_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={() => {
+                                                            setSelectedEmployees(prev => checked ? prev.filter(id => id !== emp.emp_id) : [...prev, emp.emp_id]);
+                                                        }}
+                                                    />
+                                                    <span>{emp.emp_name}{emp.emp_department ? ` — ${emp.emp_department}` : ''}</span>
+                                                </label>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
                         </div>
                         <div className="form-group">
                             <label>Description</label>

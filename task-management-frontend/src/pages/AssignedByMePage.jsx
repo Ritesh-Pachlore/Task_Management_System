@@ -69,7 +69,7 @@ const AssignedByMePage = () => {
         }
     };
 
-    const submitAction = async ({ remarks, extended_date, title, description }) => {
+    const submitAction = async ({ remarks, extended_date, title, description, emp_list }) => {
         try {
             if (actionModal.actionType === 'edit') {
                 const response = await api.post('/tasks/edit/', {
@@ -77,6 +77,7 @@ const AssignedByMePage = () => {
                     title,
                     description,
                     deadline: extended_date,
+                    emp_list: emp_list, // comma-separated ids (optional)
                 });
                 if (response.data.success) {
                     toast.success('Task updated successfully!');

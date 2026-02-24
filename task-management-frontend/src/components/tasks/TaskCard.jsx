@@ -3,6 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../common/StatusBadge';
 import PriorityBadge from '../common/PriorityBadge';
+import { STATUS_MAP, PRIORITY_MAP } from '../../utils/constants';
 import { formatDate, getDaysText } from '../../utils/formatters';
 import { MdAccessTime, MdPerson, MdHistory } from 'react-icons/md';
 import './TaskCard.css';
@@ -45,19 +46,28 @@ const TaskCard = ({ task, viewType, onAction }) => {
     const otherActions = getActions().filter(a => a.type !== 'edit');
 
     return (
-        <div className={`task-card ${isOverdue ? 'task-card-overdue' : ''}`}>
+        <div
+            className={`task-card ${isOverdue ? 'task-card-overdue' : ''}`}
+            onClick={() => navigate(`/task/${task.execution_log_id}`)}
+            style={{ cursor: 'pointer' }}
+        >
             <div className="task-card-top">
-                <div className="task-card-badges">
-                    <PriorityBadge priority={task.priority_type} />
-                    <StatusBadge status={task.status} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <PriorityBadge priority={task.priority_type} />
+                        <StatusBadge status={task.status} />
+                        {task.extended_date && <span className="task-extended-tag">Extended</span>}
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 12, color: '#666' }}>
+                        {PRIORITY_MAP[task.priority_type]?.name || ''}{', '}{STATUS_MAP[task.status]?.name || ''}
+                    </div>
                 </div>
-                {task.extended_date && <span className="task-extended-tag">Extended</span>}
 
                 {/* Edit button top-right */}
                 {editAction && (
                     <button
                         className="task-edit-btn"
-                        onClick={() => onAction(task, editAction.type)}
+                        onClick={(e) => { e.stopPropagation(); onAction(task, editAction.type); }}
                     >
                         {editAction.label}
                     </button>
@@ -101,14 +111,14 @@ const TaskCard = ({ task, viewType, onAction }) => {
                             <button
                                 key={idx}
                                 className={`btn btn-sm ${action.cls}`}
-                                onClick={() => onAction(task, action.type)}
+                                onClick={(e) => { e.stopPropagation(); onAction(task, action.type); }}
                             >
                                 {action.label}
                             </button>
                         ))}
                         <button
                             className="btn btn-sm btn-outline"
-                            onClick={() => navigate(`/task/${task.execution_log_id}`)}
+                            onClick={(e) => { e.stopPropagation(); navigate(`/task/${task.execution_log_id}`); }}
                         >
                             <MdHistory /> History
                         </button>

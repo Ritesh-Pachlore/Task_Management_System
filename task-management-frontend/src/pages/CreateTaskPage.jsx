@@ -717,7 +717,7 @@ const CreateTaskPage = () => {
                                                     }
                                                 />
                                                 <span>
-                                                    {emp.emp_name}
+                                                    {emp.emp_name}{emp.emp_department ? ` — ${emp.emp_department}` : ''}
                                                 </span>
                                             </label>
                                         );
@@ -733,8 +733,8 @@ const CreateTaskPage = () => {
                                         e => e.emp_id === id
                                     );
                                     return (
-                                        <span key={id} className="chip">
-                                            {emp?.emp_name || id}
+                                            <span key={id} className="chip">
+                                            {emp?.emp_name || id}{emp?.emp_department ? ` — ${emp.emp_department}` : ''}
                                             <button
                                                 type="button"
                                                 onClick={() =>

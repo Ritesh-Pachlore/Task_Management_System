@@ -24,6 +24,25 @@
     gap: 8px;
 }
 
+/* Prominent Edit button shown at top-right */
+.task-edit-btn {
+    background: #2f6bed;
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(47,107,237,0.15);
+}
+.task-edit-btn:hover {
+    background: #2558d6;
+}
+.task-edit-btn:focus {
+    outline: 2px solid rgba(47,107,237,0.2);
+}
+
 .task-card-badges {
     display: flex;
     gap: 8px;
