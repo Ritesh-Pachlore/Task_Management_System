@@ -1,12 +1,16 @@
 # apps/tasks/views.py
 
 from rest_framework.views import APIView
+from rest_framework.decorators import authentication_classes
+from rest_framework.permissions import IsAuthenticated
 from utils.response_handler import success_response, error_response
 from utils.constants import TaskType
 from . import services
 from .holiday_helper import get_shift_info
+from apps.authentication.token_auth import StandaloneTokenAuthentication
 
 
+@authentication_classes([StandaloneTokenAuthentication])
 class CreateTaskView(APIView):
     """
     POST /api/tasks/create/
@@ -17,10 +21,10 @@ class CreateTaskView(APIView):
         "task_description":"...",
         "task_type":       5,
         "priority_type":   2,
-        "task_start_date": "2025-07-15",   ← date only
-        "start_time":      "09:00",         ← time only
-        "task_end_date":   "2025-07-15",   ← date only
-        "end_time":        "09:30",         ← time only
+        "task_start_date": "2025-07-15",   # date only
+        "start_time":      "09:00",         # time only
+        "task_end_date":   "2025-07-15",   # date only
+        "end_time":        "09:30",         # time only
         "emp_list":        "25,30"
     }
 
@@ -29,11 +33,14 @@ class CreateTaskView(APIView):
         "task_title":      "Fix Bug",
         "task_type":       4,
         "priority_type":   3,
-        "task_start_date": "2025-07-15",   ← date only
-        "task_end_date":   "2025-07-20",   ← date only (no times)
+        "task_start_date": "2025-07-15",   # date only
+        "task_end_date":   "2025-07-20",   # date only (no times)
         "emp_list":        "25"
     }
     """
+    authentication_classes = [StandaloneTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         try:
             data      = request.data
@@ -105,8 +112,11 @@ class CreateTaskView(APIView):
             return error_response(message=str(e))
 
 
+@authentication_classes([StandaloneTokenAuthentication])
 class MyTasksView(APIView):
     """GET /api/tasks/my-tasks/"""
+    authentication_classes = [StandaloneTokenAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             filters = {}
@@ -129,8 +139,11 @@ class MyTasksView(APIView):
             return error_response(message=str(e))
 
 
+@authentication_classes([StandaloneTokenAuthentication])
 class AssignedByMeView(APIView):
     """GET /api/tasks/assigned-by-me/"""
+    authentication_classes = [StandaloneTokenAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             filters = {}
@@ -153,8 +166,11 @@ class AssignedByMeView(APIView):
             return error_response(message=str(e))
 
 
+@authentication_classes([StandaloneTokenAuthentication])
 class UpdateTaskStatusView(APIView):
     """POST /api/tasks/update-status/"""
+    authentication_classes = [StandaloneTokenAuthentication]
+    permission_classes = [IsAuthenticated]
     def post(self, request):
         try:
             data = request.data
@@ -174,8 +190,11 @@ class UpdateTaskStatusView(APIView):
             return error_response(message=str(e))
 
 
+@authentication_classes([StandaloneTokenAuthentication])
 class ExtendTaskView(APIView):
     """POST /api/tasks/extend/"""
+    authentication_classes = [StandaloneTokenAuthentication]
+    permission_classes = [IsAuthenticated]
     def post(self, request):
         try:
             data = request.data
@@ -195,8 +214,11 @@ class ExtendTaskView(APIView):
             return error_response(message=str(e))
 
 
+@authentication_classes([StandaloneTokenAuthentication])
 class TaskHistoryView(APIView):
     """GET /api/tasks/history/<id>/"""
+    authentication_classes = [StandaloneTokenAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request, execution_log_id):
         try:
             return success_response(
@@ -205,24 +227,16 @@ class TaskHistoryView(APIView):
             return error_response(message=str(e))
 
 
+@authentication_classes([StandaloneTokenAuthentication])
 class DashboardView(APIView):
-    """GET /api/tasks/dashboard/?view=SELF|ASSIGNED_BY_ME&date_from=&date_to=&employee_id="""
+    """GET /api/tasks/dashboard/?view=SELF|ASSIGNED_BY_ME"""
     def get(self, request):
         try:
             view_type = request.query_params.get('view', 'SELF')
             if view_type not in ['SELF', 'ASSIGNED_BY_ME']:
                 view_type = 'SELF'
-
-            date_from   = request.query_params.get('date_from')   or None
-            date_to     = request.query_params.get('date_to')     or None
-            employee_id = request.query_params.get('employee_id') or None
-            if employee_id:
-                employee_id = int(employee_id)
-
             result = services.get_dashboard_counts(
-                request.user.emp_id, view_type,
-                date_from, date_to, employee_id,
-            )
+                request.user.emp_id, view_type)
             return success_response(data=result)
         except Exception as e:
             return error_response(message=str(e))
@@ -240,8 +254,11 @@ class CheckDateView(APIView):
             return error_response(message=str(e))
 
 
+@authentication_classes([StandaloneTokenAuthentication])
 class AffectedByHolidayView(APIView):
     """GET /api/tasks/affected-by-holiday/?view=ASSIGNED_BY_ME"""
+    authentication_classes = [StandaloneTokenAuthentication]
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             view_type = request.query_params.get('view', 'ASSIGNED_BY_ME')

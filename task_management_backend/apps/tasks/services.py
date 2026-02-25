@@ -178,21 +178,28 @@ def get_affected_tasks(emp_id, view_type):
 
 
 def get_employees(emp_id, search=None):
+    query = """
+        SELECT
+            s.EMP_ID AS emp_id,
+            s.STF_FRNAME + ' ' + s.STF_LSNAME AS emp_name,
+            ISNULL(d.DEP_NAME, 'N/A') AS emp_department
+        FROM inout_aems..staffmst s
+        LEFT JOIN inout_aems..deptmst d ON s.DEP_ID = d.DEP_ID
+        WHERE
+            s.REP_STATUS = 1
+    """
+
+    params = []
+
     if search:
-        return run_query(
-            """
-            SELECT
-                EMP_ID AS emp_id,
-                STF_FRNAME + ' ' + STF_LSNAME AS emp_name
-            FROM inout_aems..staffmst
-           WHERE
-                REP_STATUS = 1                             
-                AND (
-                    CAST(EMP_ID AS NVARCHAR(20)) LIKE %s
-                    OR STF_FRNAME + ' ' + STF_LSNAME LIKE %s
-                )
-            ORDER BY STF_FRNAME, STF_LSNAME
-            """,
-            [f'%{search}%', f'%{search}%']
-        )
-    return call_sp('sp_get_employees', [emp_id])
+        query += """
+            AND (
+                CAST(s.EMP_ID AS NVARCHAR(20)) LIKE %s
+                OR s.STF_FRNAME + ' ' + s.STF_LSNAME LIKE %s
+            )
+        """
+        params = [f'%{search}%', f'%{search}%']
+
+    query += " ORDER BY s.STF_FRNAME, s.STF_LSNAME"
+
+    return run_query(query, params)
