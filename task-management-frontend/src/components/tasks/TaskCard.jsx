@@ -8,11 +8,37 @@ import { formatDate, getDaysText } from '../../utils/formatters';
 import { MdAccessTime, MdPerson, MdHistory } from 'react-icons/md';
 import './TaskCard.css';
 
+// Helper: get ordinal suffix (1st, 2nd, 3rd, etc.)
+const getSuffix = (day) => {
+    if (day >= 11 && day <= 13) return 'th';
+    switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+    }
+};
+
 const TaskCard = ({ task, viewType, onAction }) => {
     const navigate = useNavigate();
 
-    const isOverdue = task.is_overdue === 1 || task.is_overdue === true;
+    const status = task.status;
+    // Overdue only if status is not Approved (3) or Cancelled (6)
+    const isOverdue = (task.is_overdue === 1 || task.is_overdue === true) && ![3, 6].includes(status);
     const daysText = getDaysText(task.days_remaining);
+    const days = task.days_remaining;
+
+    // We consider 3000-12-31 as an "infinite" date that shouldn't be shown as a real deadline
+    const isInfinite = task.effective_deadline && task.effective_deadline.startsWith('3000');
+
+    const getDueDateColor = () => {
+        if (isOverdue) return 'text-danger';
+        if (isInfinite) return 'text-muted';
+        if (days === 0) return 'text-due-orange'; // Due today
+        if (days === 1) return 'text-due-yellow'; // 1 day left
+        if (days >= 2) return 'text-due-green';   // 2+ days left
+        return 'text-muted';
+    };
 
     const getActions = () => {
         const status = task.status;
@@ -48,8 +74,6 @@ const TaskCard = ({ task, viewType, onAction }) => {
     return (
         <div
             className={`task-card ${isOverdue ? 'task-card-overdue' : ''}`}
-        // onClick={() => navigate(`/task/${task.execution_log_id}`)}
-        // style={{ cursor: 'pointer' }}
         >
             <div className="task-card-top">
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -93,9 +117,16 @@ const TaskCard = ({ task, viewType, onAction }) => {
                 <div className="task-meta-item">
                     <MdAccessTime />
                     <span>
-                        {formatDate(task.effective_deadline)}
-                        {daysText && (
-                            <span className={isOverdue ? 'text-danger' : 'text-muted'}>
+                        {task.task_type === 1
+                            ? `Daily Task${!isInfinite ? ' | Due: ' + formatDate(task.effective_deadline) : ''}`
+                            : task.task_type === 2
+                                ? `Weekly task on ${task.weekly_days || 'N/A'}${(!isInfinite && task.effective_deadline) ? ' | Due: ' + formatDate(task.effective_deadline) : ''}`
+                                : task.task_type === 3
+                                    ? `Monthly task on ${task.monthly_day_of_month ? task.monthly_day_of_month + getSuffix(task.monthly_day_of_month) : 'N/A'}${(!isInfinite && task.effective_deadline) ? ' | Due: ' + formatDate(task.effective_deadline) : ''}`
+                                    : formatDate(task.effective_deadline)
+                        }
+                        {!isInfinite && daysText && (
+                            <span className={getDueDateColor()}>
                                 {' '}({daysText})
                             </span>
                         )}
@@ -103,7 +134,6 @@ const TaskCard = ({ task, viewType, onAction }) => {
                 </div>
             </div>
 
-            {/* Other actions at the bottom - always show History button */}
             <div className="task-card-actions">
                 <div className="btn-group">
                     {otherActions.map((action, idx) => (
@@ -115,9 +145,14 @@ const TaskCard = ({ task, viewType, onAction }) => {
                             {action.label}
                         </button>
                     ))}
+
+                    {/* Always visible History button */}
                     <button
                         className="btn btn-sm btn-outline"
-                        onClick={(e) => { e.stopPropagation(); navigate(`/task/${task.execution_log_id}`); }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/task/${task.execution_log_id}`);
+                        }}
                     >
                         <MdHistory /> History
                     </button>

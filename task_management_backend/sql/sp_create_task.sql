@@ -23,7 +23,7 @@ ALTER PROCEDURE [dbo].[sp_create_task]
     -- Recurrence parameters
     @recurrence_type       VARCHAR(10)  = NULL, -- 'DAILY', 'WEEKLY', 'MONTHLY'
     @recurrence_end_date   DATE         = NULL,
-    @weekly_days           VARCHAR(20)  = NULL,
+    @weekly_days           VARCHAR(100) = NULL,
     @monthly_day_of_month  INT          = NULL
 AS
 BEGIN
@@ -46,6 +46,12 @@ BEGIN
 
         SET @final_end_dt   = CAST(@task_end_date AS DATETIME)
                             + ISNULL(CAST(@task_end_time AS DATETIME), 0);
+    END
+    ELSE IF @task_type = 1 -- DAILY
+    BEGIN
+        SET @final_start_dt = CAST(@task_start_date AS DATETIME);
+        -- For Daily tasks, set the instance deadline to 11:59:59 PM of the same day
+        SET @final_end_dt   = DATEADD(SECOND, 86399, CAST(@task_start_date AS DATETIME));
     END
     ELSE
     BEGIN
@@ -88,8 +94,11 @@ BEGIN
         
         DECLARE @should_assign BIT = 0;
         IF @task_type NOT IN (1, 2, 3) SET @should_assign = 1;
-        ELSE IF @task_type IN (1, 2, 3) AND dbo.fn_is_non_working_day(CAST(GETDATE() AS DATE)) = 0
-            SET @should_assign = 1; -- Simple: assign if today is working day
+        -- Assign only if today is >= start date AND it's a working day
+        ELSE IF @task_type IN (1, 2, 3) 
+                AND CAST(GETDATE() AS DATE) >= @task_start_date
+                AND dbo.fn_is_non_working_day(CAST(GETDATE() AS DATE)) = 0
+            SET @should_assign = 1; 
 
         IF @should_assign = 1
         BEGIN

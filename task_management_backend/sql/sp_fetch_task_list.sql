@@ -84,24 +84,31 @@ BEGIN
         -- ── Deadline calculations ────────────────────────────────
         COALESCE(el.extended_date, td.task_end_date) AS effective_deadline,
 
-        DATEDIFF(DAY, GETDATE(),
-            COALESCE(el.extended_date, td.task_end_date))   AS days_remaining,
-
         CASE
             WHEN COALESCE(el.extended_date, td.task_end_date) < GETDATE()
                  AND el.status NOT IN (3, 6)
             THEN 1 ELSE 0
         END AS is_overdue,
 
+        CASE
+            WHEN el.status IN (3, 6) THEN NULL -- Completed or Cancelled tasks
+            ELSE DATEDIFF(day, GETDATE(), COALESCE(el.extended_date, td.task_end_date))
+        END AS days_remaining,
+
+        -- ── Recurrence info (for display) ────────────────────────
+        rp.weekly_days,
+        rp.monthly_day_of_month,
+
         @view_type AS view_type
 
     FROM task_details td
-    INNER JOIN task_execution_log el ON td.task_id = el.task_id
+    LEFT JOIN task_execution_log el ON td.task_id = el.task_id
+    LEFT JOIN recurrence_pattern rp ON td.task_id = rp.task_id
 
     WHERE td.is_active = 1
       AND (
             (@view_type = 'SELF'           AND el.emp_id      = @emp_id)
-         OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id)
+         OR (@view_type = 'ASSIGNED_BY_ME' AND td.created_by = @emp_id)
           )
       AND (@filter_status        IS NULL OR el.status        = @filter_status)
       AND (@filter_priority      IS NULL OR td.priority_type = @filter_priority)

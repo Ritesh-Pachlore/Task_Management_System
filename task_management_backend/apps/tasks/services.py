@@ -46,27 +46,55 @@ def create_task(task_data, created_by, created_by_name=""):
 
     task_type = int(task_data['task_type'])
 
+    # ── Recurrence Field Mapping ────────────────────────────────
+    recurrence_type = None
+    recurrence_end_date = None
+    weekly_days = '0'
+    monthly_day_of_month = 0
+
+    if task_type in [TaskType.DAILY, TaskType.WEEKLY, TaskType.MONTHLY]:
+        # recurrence_type now maps to numeric IDs: 1(Daily), 2(Weekly), 3(Monthly)
+        recurrence_type = task_data.get('recurrence_type')
+        if not recurrence_type:
+            recurrence_type = str(task_type)
+            
+        recurrence_end_date = task_data.get('recurrence_end_date')
+        if not recurrence_end_date or recurrence_end_date == '':
+            recurrence_end_date = '3000-12-31'
+        
+        if task_type == TaskType.DAILY:
+            weekly_days = '0'
+            monthly_day_of_month = 0
+            if not task_data.get('task_start_date'):
+                from datetime import date
+                task_data['task_start_date'] = date.today().isoformat()
+        elif task_type == TaskType.WEEKLY:
+            weekly_days = task_data.get('weekly_days') or '0'
+            monthly_day_of_month = 0
+        elif task_type == TaskType.MONTHLY:
+            weekly_days = '0'
+            # Derive from start_date if not explicitly provided
+            monthly_day_of_month = task_data.get('monthly_day_of_month')
+            if not monthly_day_of_month and task_data.get('task_start_date'):
+                try:
+                    from datetime import datetime
+                    dt = datetime.strptime(task_data['task_start_date'], '%Y-%m-%d')
+                    monthly_day_of_month = dt.day
+                except:
+                    monthly_day_of_month = 0
+            monthly_day_of_month = monthly_day_of_month or 0
+
+    # ── Default end date for non-recurrent (Random/Time) ────────
+    if not task_data.get('task_end_date'):
+        task_data['task_end_date'] = task_data.get('task_start_date')
+
     # ── Extract time fields (only meaningful for TIME_BOUND) ─────
-    # Service passes them to SP regardless of task_type.
-    # SP internally nullifies if not TIME_BOUND — double safety.
     if task_type == TaskType.TIME_BOUND:
         start_time = task_data.get('start_time') or None
         end_time   = task_data.get('end_time')   or None
     else:
-        # Force None for all non-TIME_BOUND types
         start_time = None
         end_time   = None
-
-    # ── FUTURE: when DAILY/WEEKLY/MONTHLY are implemented ────────
-    # if task_type == TaskType.DAILY:
-    #     start_time = None   (no time for daily)
-    #     end_time   = None
-    # if task_type == TaskType.WEEKLY:
-    #     weekly_day = task_data.get('day_of_week')
-    # if task_type == TaskType.MONTHLY:
-    #     start_time = None
-    #     end_time   = None
-    # ─────────────────────────────────────────────────────────────
 
     result = call_sp('sp_create_task', [
         task_data['task_title'],
@@ -80,10 +108,10 @@ def create_task(task_data, created_by, created_by_name=""):
         created_by,
         task_data['emp_list'],
         # New Recurrence params
-        task_data.get('recurrence_type'),
-        task_data.get('recurrence_end_date'),
-        task_data.get('weekly_days'),
-        task_data.get('monthly_day_of_month'),
+        recurrence_type,
+        recurrence_end_date,
+        weekly_days,
+        monthly_day_of_month,
     ])
 
     if result and result[0].get('success') == 1:

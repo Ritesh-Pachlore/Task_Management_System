@@ -64,7 +64,7 @@ BEGIN
 
     -- RESULT SET 3: Status chart
     SELECT
-        CASE el.status WHEN 0 THEN 'Assigned' WHEN 1 THEN 'Started' WHEN 2 THEN 'Submitted'
+        CASE el.status WHEN 0 THEN 'Pending' WHEN 1 THEN 'Started' WHEN 2 THEN 'Submitted'
             WHEN 3 THEN 'Approved' WHEN 4 THEN 'Rejected' WHEN 5 THEN 'Resubmitted'
             WHEN 6 THEN 'Cancelled' WHEN 7 THEN 'On Hold' END AS name,
         COUNT(*) AS value,

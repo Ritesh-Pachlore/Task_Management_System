@@ -5,13 +5,25 @@ __pycache__/
 *.pyd
 
 # Virtual environment
-task_management/
+task_management_system/
 venv/
 env/
+.env
 
 # Django
 db.sqlite3
+*.log
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+
+# Frontend
+task-management-frontend/node_modules/
+task-management-frontend/build/
+task-management-frontend/.env.local
+task-management-frontend/.env.development.local
+task-management-frontend/.env.test.local
+task-management-frontend/.env.production.local

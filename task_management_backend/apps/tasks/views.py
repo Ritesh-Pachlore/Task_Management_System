@@ -50,7 +50,8 @@ class CreateTaskView(APIView):
             if not data.get('task_title', '').strip():
                 return error_response("task_title is required")
 
-            if not data.get('task_start_date'):
+            # task_start_date is required, EXCEPT for Daily tasks which default to today
+            if not data.get('task_start_date') and task_type != TaskType.DAILY:
                 return error_response("task_start_date is required")
 
             if not data.get('emp_list'):
@@ -75,9 +76,8 @@ class CreateTaskView(APIView):
                         "end_time must be after start_time on the same day")
 
             elif task_type in [TaskType.DAILY, TaskType.WEEKLY, TaskType.MONTHLY]:
-                # Recurring tasks MUST have end_date
-                if not data.get('task_end_date'):
-                    return error_response(f"task_end_date is required for {TaskType.CHOICES[task_type]} tasks")
+                # Recurring tasks: end_date is now optional, default to infinite handled in services
+                pass
                 
                 # Check for recurrence_end_date (optional but recommended)
                 # Actually, in our scheme, task_end_date is the date of the FIRST instance, 
@@ -108,6 +108,11 @@ class CreateTaskView(APIView):
                 created_by      = request.user.emp_id,
                 created_by_name = request.user.emp_name,
             )
+            
+            # SP result is a list with one dict
+            if result and result[0].get('success') == 0:
+                return error_response(result[0].get('message', 'Failed to create task'))
+
             return success_response(
                 data    = result,
                 message = "Task created successfully",
@@ -234,6 +239,9 @@ class TaskHistoryView(APIView):
 @authentication_classes([StandaloneTokenAuthentication])
 class DashboardView(APIView):
     """GET /api/tasks/dashboard/?view=SELF|ASSIGNED_BY_ME"""
+    authentication_classes = [StandaloneTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         try:
             view_type = request.query_params.get('view', 'SELF')
@@ -248,6 +256,8 @@ class DashboardView(APIView):
 
 class CheckDateView(APIView):
     """GET /api/tasks/check-date/?date=2025-07-06"""
+    permission_classes = [IsAuthenticated] # Or AllowAny if this should be public
+
     def get(self, request):
         try:
             d = request.query_params.get('date')

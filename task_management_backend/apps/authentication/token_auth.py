@@ -20,7 +20,14 @@ class SimpleUser:
     def __init__(self, emp_id, emp_name):
         self.emp_id = emp_id
         self.emp_name = emp_name
-        self.is_authenticated = True
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
 
     def __str__(self):
         return f"{self.emp_name} (ID: {self.emp_id})"
@@ -44,18 +51,22 @@ class StandaloneTokenAuthentication(BaseAuthentication):
 
     def authenticate(self, request):
         auth_header = request.headers.get('Authorization', '')
+        print(f"DEBUG: Auth Header: {auth_header[:20]}...") 
 
         if not auth_header.startswith('Bearer '):
+            print("DEBUG: No Bearer token found")
             return None
 
         token = auth_header.replace('Bearer ', '').strip()
         if not token:
+            print("DEBUG: Token is empty")
             return None
 
         try:
             payload = jwt.decode(
                 token, settings.JWT_SECRET_KEY, algorithms=['HS256']
             )
+            print(f"DEBUG: Token Decoded. Emp ID: {payload.get('emp_id')}")
             user = SimpleUser(
                 emp_id=payload.get('emp_id'),
                 emp_name=payload.get('emp_name', 'Unknown'),
@@ -63,7 +74,9 @@ class StandaloneTokenAuthentication(BaseAuthentication):
             return (user, token)
 
         except jwt.ExpiredSignatureError:
+            print("DEBUG: Token Expired")
             raise AuthenticationFailed('Token expired. Generate a new one.')
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as e:
+            print(f"DEBUG: Invalid Token: {str(e)}")
             raise AuthenticationFailed('Invalid token.')
         
