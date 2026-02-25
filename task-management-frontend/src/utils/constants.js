@@ -29,7 +29,7 @@ export const STATUS_OPTIONS = [
     { value: 4, label: 'Rejected' },
     { value: 5, label: 'Resubmitted' },
     { value: 6, label: 'Cancelled' },
-    { value: 7, label: 'On Hold' },
+    // { value: 7, label: 'On Hold' },
 ];
 
 export const PRIORITY_OPTIONS = [

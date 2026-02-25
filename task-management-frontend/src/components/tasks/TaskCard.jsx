@@ -48,8 +48,8 @@ const TaskCard = ({ task, viewType, onAction }) => {
     return (
         <div
             className={`task-card ${isOverdue ? 'task-card-overdue' : ''}`}
-            onClick={() => navigate(`/task/${task.execution_log_id}`)}
-            style={{ cursor: 'pointer' }}
+        // onClick={() => navigate(`/task/${task.execution_log_id}`)}
+        // style={{ cursor: 'pointer' }}
         >
             <div className="task-card-top">
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
