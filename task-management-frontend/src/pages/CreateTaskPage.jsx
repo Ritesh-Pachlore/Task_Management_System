@@ -1,10 +1,10 @@
 // src/pages/CreateTaskPage.jsx
 
-import React, { useState, useEffect,useRef} from 'react';
-import { useNavigate }    from 'react-router-dom';
-import api                from '../api/axios';
-import { toast }          from 'react-toastify';
-import DateShiftModal     from '../components/common/DateShiftModal';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/axios';
+import { toast } from 'react-toastify';
+import DateShiftModal from '../components/common/DateShiftModal';
 import './CreateTaskPage.css';
 
 // ─────────────────────────────────────────────────────────────────
@@ -24,72 +24,73 @@ import './CreateTaskPage.css';
 
 const TASK_TYPES = [
     {
-        value:       4,
-        label:       'Random',
+        value: 4,
+        label: 'Random',
         // icon:        '🎲',
         // description: 'No fixed end date',
-        active:      true,
+        active: true,
     },
     {
-        value:       5,
-        label:       'Time Bound',
+        value: 5,
+        label: 'Time Bound',
         // icon:        '⏱️',
         // description: 'Fixed start & end with time',
-        active:      true,
+        active: true,
     },
-    // ── FUTURE TYPES — uncomment block + backend when ready ──────
-    // {
-    //     value:       1,
-    //     label:       'Daily',
-    //     icon:        '📅',
-    //     description: 'Repeats every day',
-    //     active:      false,
-    // },
-    // {
-    //     value:       2,
-    //     label:       'Weekly',
-    //     icon:        '📆',
-    //     description: 'On a specific day each week',
-    //     active:      false,
-    // },
-    // {
-    //     value:       3,
-    //     label:       'Monthly',
-    //     icon:        '🗓️',
-    //     description: 'Repeats every month',
-    //     active:      false,
-    // },
+    {
+        value: 1,
+        label: 'Daily',
+        icon: '📅',
+        description: 'Repeats every day',
+        active: true,
+    },
+    {
+        value: 2,
+        label: 'Weekly',
+        icon: '📆',
+        description: 'On a specific day each week',
+        active: true,
+    },
+    {
+        value: 3,
+        label: 'Monthly',
+        icon: '🗓️',
+        description: 'Repeats every month',
+        active: true,
+    },
 ];
 
 const PRIORITIES = [
-    { value: 1, label: 'Low',    color: '#4CAF50', bg: '#E8F5E9' },
+    { value: 1, label: 'Low', color: '#4CAF50', bg: '#E8F5E9' },
     { value: 2, label: 'Medium', color: '#FF9800', bg: '#FFF3E0' },
-    { value: 3, label: 'High',   color: '#F44336', bg: '#FFEBEE' },
+    { value: 3, label: 'High', color: '#F44336', bg: '#FFEBEE' },
 ];
 
 // Days for future WEEKLY type
-// const DAYS_OF_WEEK = [
-//     { value: 'Monday',    short: 'Mon' },
-//     { value: 'Tuesday',   short: 'Tue' },
-//     { value: 'Wednesday', short: 'Wed' },
-//     { value: 'Thursday',  short: 'Thu' },
-//     { value: 'Friday',    short: 'Fri' },
-//     { value: 'Saturday',  short: 'Sat' },
-//     { value: 'Sunday',    short: 'Sun' },
-// ];
+const DAYS_OF_WEEK = [
+    { value: 'Monday', short: 'Mon' },
+    { value: 'Tuesday', short: 'Tue' },
+    { value: 'Wednesday', short: 'Wed' },
+    { value: 'Thursday', short: 'Thu' },
+    { value: 'Friday', short: 'Fri' },
+    { value: 'Saturday', short: 'Sat' },
+    { value: 'Sunday', short: 'Sun' },
+];
 
 const today = new Date().toISOString().split('T')[0];
 
 const INITIAL_FORM = {
-    task_title:        '',
-    task_description:  '',
-    task_type:         4,          // default → Random
-    priority_type:     2,          // default → Medium
-    task_start_date:   today,
-    task_end_date:     '',
-    start_time:        '',          // only for TIME_BOUND
-    end_time:          '',          // only for TIME_BOUND
-    // day_of_week:    '',          // FUTURE: Weekly
+    task_title: '',
+    task_description: '',
+    task_type: 4,          // default → Random
+    priority_type: 2,          // default → Medium
+    task_start_date: today,
+    task_end_date: '',
+    start_time: '',          // only for TIME_BOUND
+    end_time: '',          // only for TIME_BOUND
+    recurrence_end_date: '',
+    weekly_days: [],          // for Weekly
+    monthly_day_of_month: '',       // for Monthly
     selectedEmployees: [],
 };
 
@@ -99,15 +100,15 @@ const CreateTaskPage = () => {
     const navigate = useNavigate();
     const dropdownRef = useRef(null);
 
-    const [form,        setForm]        = useState(INITIAL_FORM);
-    const [employees,   setEmployees]   = useState([]);
-    const [empSearch,   setEmpSearch]   = useState('');
-    const [empLoading,  setEmpLoading]  = useState(false);
-    const [submitting,  setSubmitting]  = useState(false);
-     const [showEmpList, setShowEmpList] = useState(false);
+    const [form, setForm] = useState(INITIAL_FORM);
+    const [employees, setEmployees] = useState([]);
+    const [empSearch, setEmpSearch] = useState('');
+    const [empLoading, setEmpLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [showEmpList, setShowEmpList] = useState(false);
 
     // Date shift modal state
-    const [shiftInfo,   setShiftInfo]   = useState(null);
+    const [shiftInfo, setShiftInfo] = useState(null);
     const [shiftTarget, setShiftTarget] = useState('');   // 'task_start_date' | 'task_end_date'
 
 
@@ -170,11 +171,23 @@ const CreateTaskPage = () => {
     const handleTaskTypeChange = (typeValue) => {
         setForm(prev => ({
             ...prev,
-            task_type:      typeValue,
-            task_end_date:  '',
-            start_time:     '',
-            end_time:       '',
-            // day_of_week: '',   // FUTURE: reset weekly
+            task_type: typeValue,
+            task_end_date: '',
+            start_time: '',
+            end_time: '',
+            recurrence_end_date: '',
+            weekly_days: [],
+            monthly_day_of_month: '',
+        }));
+    };
+
+    // ── Toggle weekly day ───────────────────────────────────────
+    const toggleWeeklyDay = (day) => {
+        setForm(prev => ({
+            ...prev,
+            weekly_days: prev.weekly_days.includes(day)
+                ? prev.weekly_days.filter(d => d !== day)
+                : [...prev.weekly_days, day],
         }));
     };
 
@@ -197,7 +210,7 @@ const CreateTaskPage = () => {
         if (!value) return;
 
         try {
-            const res  = await api.get(`/tasks/check-date/?date=${value}`);
+            const res = await api.get(`/tasks/check-date/?date=${value}`);
             const data = res.data?.data;
             if (data?.needs_shift) {
                 setShiftTarget(field);
@@ -265,29 +278,31 @@ const CreateTaskPage = () => {
             }
         }
 
-        // ── FUTURE validations (commented out) ───────────────────
-        // DAILY (1):
-        // if (form.task_type === 1) {
-        //     if (!form.task_end_date) {
-        //         toast.error('End date required for Daily tasks');
-        //         return false;
-        //     }
-        // }
-        // WEEKLY (2):
-        // if (form.task_type === 2) {
-        //     if (!form.day_of_week) {
-        //         toast.error('Please select a day of the week');
-        //         return false;
-        //     }
-        // }
-        // MONTHLY (3):
-        // if (form.task_type === 3) {
-        //     if (!form.task_end_date) {
-        //         toast.error('End date required for Monthly tasks');
-        //         return false;
-        //     }
-        // }
-        // ────────────────────────────────────────────────────────
+        // ── RECURRENCE validations ────────────────────────────────
+        if ([1, 2, 3].includes(form.task_type)) {
+            if (!form.recurrence_end_date) {
+                toast.error('Recurrence end date is required');
+                return false;
+            }
+            if (form.recurrence_end_date < form.task_start_date) {
+                toast.error('Recurrence end date cannot be before start date');
+                return false;
+            }
+
+            if (form.task_type === 2) { // WEEKLY
+                if (form.weekly_days.length === 0) {
+                    toast.error('Please select at least one day for weekly recurrence');
+                    return false;
+                }
+            }
+
+            if (form.task_type === 3) { // MONTHLY
+                if (!form.monthly_day_of_month) {
+                    toast.error('Please select a day of the month');
+                    return false;
+                }
+            }
+        }
 
         return true;
     };
@@ -303,25 +318,36 @@ const CreateTaskPage = () => {
         // SP combines them: "2025-07-15" + "09:00" → 2025-07-15 09:00:00
         // ─────────────────────────────────────────────────────────
         const payload = {
-            task_title:       form.task_title.trim(),
+            task_title: form.task_title.trim(),
             task_description: form.task_description.trim(),
-            task_type:        form.task_type,
-            priority_type:    form.priority_type,
-            task_start_date:  form.task_start_date,
-            task_end_date:    form.task_end_date || form.task_start_date,
-            emp_list:         form.selectedEmployees.join(','),
+            task_type: form.task_type,
+            priority_type: form.priority_type,
+            task_start_date: form.task_start_date,
+            task_end_date: form.task_end_date || form.task_start_date,
+            emp_list: form.selectedEmployees.join(','),
         };
 
         // Include times only for TIME_BOUND
         if (form.task_type === 5) {
             payload.start_time = form.start_time;
-            payload.end_time   = form.end_time;
+            payload.end_time = form.end_time;
         }
 
-        // FUTURE: Weekly
-        // if (form.task_type === 2) {
-        //     payload.day_of_week = form.day_of_week;
-        // }
+        // Recurrence specific fields
+        if ([1, 2, 3].includes(form.task_type)) {
+            payload.recurrence_type = form.task_type === 1 ? 'DAILY' : form.task_type === 2 ? 'WEEKLY' : 'MONTHLY';
+            payload.recurrence_end_date = form.recurrence_end_date;
+
+            if (form.task_type === 2) {
+                payload.weekly_days = form.weekly_days.join(',');
+            }
+            if (form.task_type === 1) {
+                payload.weekly_days = 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday';
+            }
+            if (form.task_type === 3) {
+                payload.monthly_day_of_month = form.monthly_day_of_month;
+            }
+        }
 
         setSubmitting(true);
         try {
@@ -396,11 +422,10 @@ const CreateTaskPage = () => {
                                 <button
                                     key={type.value}
                                     type="button"
-                                    className={`toggle-btn ${
-                                        form.task_type === type.value
-                                            ? 'toggle-btn-active'
-                                            : ''
-                                    }`}
+                                    className={`toggle-btn ${form.task_type === type.value
+                                        ? 'toggle-btn-active'
+                                        : ''
+                                        }`}
                                     onClick={() => handleTaskTypeChange(type.value)}
                                     title={type.description}
                                 >
@@ -410,7 +435,7 @@ const CreateTaskPage = () => {
                                 </button>
                             ))}
 
-                            
+
 
                             {/* ── FUTURE placeholder buttons ────────────────────
                                 Uncomment when Daily/Weekly/Monthly are ready.
@@ -432,22 +457,50 @@ const CreateTaskPage = () => {
                             ──────────────────────────────────────────────── */}
                         </div>
 
-                         {/* Type hint message */}
-                        <p className="type-hint">
-                           {/* {form.task_type === 4 &&
-                                '🎲 Random — Set a start date. End date is optional.'}
-                            {form.task_type === 5 &&
-                                '⏱️ Time Bound — Requires start & end date with exact times.'}
-                             FUTURE:
-                            {form.task_type === 1 && '📅 Daily — Runs every day between start & end.'}
-                            {form.task_type === 2 && '📆 Weekly — Runs on a chosen day each week.'}
-                            {form.task_type === 3 && '🗓️ Monthly — Runs once every month.'}
-                            */}
-                        </p>  
-        
+
                     </div>
 
-                    
+                    {/* ══════════════════════════════════════════
+                        SECTION 3: Priority toggle buttons
+                    ══════════════════════════════════════════ */}
+                    <div className="form-group">
+                        <label className="form-label">
+                            Priority <span className="req">*</span>
+                        </label>
+                        <div className="toggle-group">
+                            {PRIORITIES.map(p => {
+                                const isActive = form.priority_type === p.value;
+                                return (
+                                    <button
+                                        key={p.value}
+                                        type="button"
+                                        className={`toggle-btn priority-btn ${isActive ? 'priority-btn-active' : ''
+                                            }`}
+                                        style={isActive
+                                            ? {
+                                                background: p.color,
+                                                borderColor: p.color,
+                                                color: 'white'
+                                            }
+                                            : {
+                                                borderColor: p.color,
+                                                color: p.color,
+                                                background: p.bg
+                                            }
+                                        }
+                                        onClick={() => setField('priority_type', p.value)}
+                                    >
+                                        {p.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* ══════════════════════════════════════════
+                        SECTION 4: Conditional Date/Time Fields
+                        (changes based on task_type)
+                    ══════════════════════════════════════════ */}
                     {/* ── RANDOM (4): Start Date only ─────────── */}
                     {form.task_type === 4 && (
                         <div className="form-group">
@@ -542,131 +595,108 @@ const CreateTaskPage = () => {
                             </div>
 
                             {/* Live preview of what will be stored */}
-                            {/* {form.task_start_date && form.start_time &&
-                             form.task_end_date && form.end_time && (
-                                <div className="datetime-preview">
-                                    <span>💾 Will save:</span>
-                                    <code>
-                                        {form.task_start_date} {form.start_time}:00
-                                    </code>
-                                    <span>→</span>
-                                    <code>
-                                        {form.task_end_date} {form.end_time}:00
-                                    </code>
-                                </div>
-                            )} */}
+                            {form.task_start_date && form.start_time &&
+                                form.task_end_date && form.end_time && (
+                                    <div className="datetime-preview">
+                                        <span>💾 Will save:</span>
+                                        <code>
+                                            {form.task_start_date} {form.start_time}:00
+                                        </code>
+                                        <span>→</span>
+                                        <code>
+                                            {form.task_end_date} {form.end_time}:00
+                                        </code>
+                                    </div>
+                                )}
                         </>
                     )}
 
-
-                    {/* ══════════════════════════════════════════
-                        SECTION 3: Priority toggle buttons
-                    ══════════════════════════════════════════ */}
-                    <div className="form-group">
-                        <label className="form-label">
-                            Priority <span className="req">*</span>
-                        </label>
-                        <div className="toggle-group">
-                            {PRIORITIES.map(p => {
-                                const isActive = form.priority_type === p.value;
-                                return (
-                                    <button
-                                        key={p.value}
-                                        type="button"
-                                        className={`toggle-btn priority-btn ${
-                                            isActive ? 'priority-btn-active' : ''
-                                        }`}
-                                        style={isActive
-                                            ? { background: p.color,
-                                                borderColor: p.color,
-                                                color: 'white' }
-                                            : { borderColor: p.color,
-                                                color: p.color,
-                                                background: p.bg }
+                    {/* ── RECURRING (1, 2, 3) ── */}
+                    {[1, 2, 3].includes(form.task_type) && (
+                        <div className="recurrence-box">
+                            <div className="datetime-row">
+                                <div className="form-group">
+                                    <label className="form-label">
+                                        Start Date <span className="req">*</span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        className="form-control"
+                                        value={form.task_start_date}
+                                        onChange={e =>
+                                            handleDateChange('task_start_date', e.target.value)
                                         }
-                                        onClick={() => setField('priority_type', p.value)}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">
+                                        Recurrence End Date <span className="req">*</span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        className="form-control"
+                                        value={form.recurrence_end_date}
+                                        min={form.task_start_date}
+                                        onChange={e =>
+                                            setField('recurrence_end_date', e.target.value)
+                                        }
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Weekly specific: Days checkboxes */}
+                            {form.task_type === 2 && (
+                                <div className="form-group">
+                                    <label className="form-label">Repeat on <span className="req">*</span></label>
+                                    <div className="toggle-group chips-wrap" style={{ marginTop: 8 }}>
+                                        {DAYS_OF_WEEK.map(day => (
+                                            <button
+                                                key={day.value}
+                                                type="button"
+                                                className={`toggle-btn ${form.weekly_days.includes(day.value) ? 'toggle-btn-active' : ''
+                                                    }`}
+                                                style={{ padding: '6px 12px', minWidth: 'auto' }}
+                                                onClick={() => toggleWeeklyDay(day.value)}
+                                            >
+                                                {day.short}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Monthly specific: Day of month dropdown */}
+                            {form.task_type === 3 && (
+                                <div className="form-group">
+                                    <label className="form-label">Day of Month <span className="req">*</span></label>
+                                    <select
+                                        className="form-control"
+                                        style={{ maxWidth: 120 }}
+                                        value={form.monthly_day_of_month}
+                                        onChange={e => setField('monthly_day_of_month', e.target.value)}
                                     >
-                                        {p.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* ══════════════════════════════════════════
-                        SECTION 4: Conditional Date/Time Fields
-                        (changes based on task_type)
-                    ══════════════════════════════════════════ */}
-
-                    {/* ── FUTURE: DAILY (1) ───────────────────────
-                    {form.task_type === 1 && (
-                        <div className="two-col">
-                            <div className="form-group">
-                                <label className="form-label">Start Date *</label>
-                                <input type="date" className="form-control"
-                                    value={form.task_start_date}
-                                    onChange={e => handleDateChange('task_start_date', e.target.value)} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">End Date *</label>
-                                <input type="date" className="form-control"
-                                    value={form.task_end_date}
-                                    min={form.task_start_date}
-                                    onChange={e => handleDateChange('task_end_date', e.target.value)} />
-                            </div>
+                                        <option value="">Select Day</option>
+                                        {[...Array(31)].map((_, i) => (
+                                            <option key={i + 1} value={i + 1}>{i + 1}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                         </div>
                     )}
-                    ────────────────────────────────────────────── */}
 
-                    {/* ── FUTURE: WEEKLY (2) ──────────────────────
-                    {form.task_type === 2 && (
-                        <div className="form-group">
-                            <label className="form-label">Day of Week *</label>
-                            <div className="toggle-group">
-                                {DAYS_OF_WEEK.map(day => (
-                                    <button key={day.value} type="button"
-                                        className={`toggle-btn ${
-                                            form.day_of_week === day.value ? 'toggle-btn-active' : ''
-                                        }`}
-                                        onClick={() => setField('day_of_week', day.value)}>
-                                        {day.short}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    ────────────────────────────────────────────── */}
-
-                    {/* ── FUTURE: MONTHLY (3) ─────────────────────
-                    {form.task_type === 3 && (
-                        <div className="two-col">
-                            <div className="form-group">
-                                <label className="form-label">Start Date *</label>
-                                <input type="date" className="form-control"
-                                    value={form.task_start_date}
-                                    onChange={e => handleDateChange('task_start_date', e.target.value)} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">End Date *</label>
-                                <input type="date" className="form-control"
-                                    value={form.task_end_date}
-                                    min={form.task_start_date}
-                                    onChange={e => handleDateChange('task_end_date', e.target.value)} />
-                            </div>
-                        </div>
-                    )}
-                    ────────────────────────────────────────────── */}
 
                     {/* ══════════════════════════════════════════
                         SECTION 5: Employee Assignment
                         Search by ID or Name (single input)
                     ══════════════════════════════════════════ */}
-                    
+
                     <div className="form-group" ref={dropdownRef}>
                         <label className="form-label">
                             Assign To <span className="req">*</span>
                         </label>
 
+                        {/* Search input */}
                         <div className="search-wrap">
                             <span className="search-icon">🔍</span>
                             <input
@@ -675,49 +705,45 @@ const CreateTaskPage = () => {
                                 placeholder="Search employee..."
                                 value={empSearch}
                                 onFocus={() => setShowEmpList(true)}
-                                onChange={e =>
-                                    setEmpSearch(e.target.value)
-                                }
+                                onChange={e => setEmpSearch(e.target.value)}
                             />
                         </div>
 
+                        {/* Employee list box */}
                         {showEmpList && (
                             <div className="emp-list-box">
                                 {empLoading ? (
                                     <div className="emp-list-state">
-                                        Loading employees...
+                                        <div className="spinner"
+                                            style={{ width: 22, height: 22 }} />
+                                        <span>Loading employees...</span>
                                     </div>
                                 ) : employees.length === 0 ? (
                                     <div className="emp-list-state">
-                                        No employees found
+                                        {empSearch
+                                            ? `No employee found matching "${empSearch}"`
+                                            : 'No employees available'}
                                     </div>
                                 ) : (
                                     employees.map(emp => {
                                         const isChecked =
-                                            form.selectedEmployees.includes(
-                                                emp.emp_id
-                                            );
-
+                                            form.selectedEmployees.includes(emp.emp_id);
                                         return (
                                             <label
                                                 key={emp.emp_id}
-                                                className={`emp-row ${
-                                                    isChecked
-                                                        ? 'emp-row-checked'
-                                                        : ''
-                                                }`}
+                                                className={`emp-row ${isChecked ? 'emp-row-checked' : ''
+                                                    }`}
                                             >
                                                 <input
                                                     type="checkbox"
                                                     checked={isChecked}
-                                                    onChange={() =>
-                                                        toggleEmployee(
-                                                            emp.emp_id
-                                                        )
-                                                    }
+                                                    onChange={() => toggleEmployee(emp.emp_id)}
                                                 />
-                                                <span>
-                                                    {emp.emp_name}{emp.emp_department ? ` — ${emp.emp_department}` : ''}
+                                                <span className="emp-row-name">
+                                                    {emp.emp_name}
+                                                </span>
+                                                <span className="emp-row-id">
+                                                    #{emp.emp_id}
                                                 </span>
                                             </label>
                                         );
@@ -726,6 +752,7 @@ const CreateTaskPage = () => {
                             </div>
                         )}
 
+                        {/* Selected employee chips */}
                         {form.selectedEmployees.length > 0 && (
                             <div className="chips-wrap">
                                 {form.selectedEmployees.map(id => {
@@ -733,8 +760,8 @@ const CreateTaskPage = () => {
                                         e => e.emp_id === id
                                     );
                                     return (
-                                            <span key={id} className="chip">
-                                            {emp?.emp_name || id}{emp?.emp_department ? ` — ${emp.emp_department}` : ''}
+                                        <span key={id} className="chip">
+                                            {emp?.emp_name || id}
                                             <button
                                                 type="button"
                                                 onClick={() =>

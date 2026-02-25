@@ -74,29 +74,33 @@ class CreateTaskView(APIView):
                     return error_response(
                         "end_time must be after start_time on the same day")
 
+            elif task_type in [TaskType.DAILY, TaskType.WEEKLY, TaskType.MONTHLY]:
+                # Recurring tasks MUST have end_date
+                if not data.get('task_end_date'):
+                    return error_response(f"task_end_date is required for {TaskType.CHOICES[task_type]} tasks")
+                
+                # Check for recurrence_end_date (optional but recommended)
+                # Actually, in our scheme, task_end_date is the date of the FIRST instance, 
+                # but for recurring, we'll use it as the pattern start if start_date is used.
+                # Let's keep it simple.
+                
+                if task_type == TaskType.WEEKLY:
+                    if not data.get('weekly_days'):
+                        return error_response("weekly_days is required for Weekly tasks")
+                
+                elif task_type == TaskType.MONTHLY:
+                    if not data.get('monthly_day_of_month'):
+                        return error_response("monthly_day_of_month is required for Monthly tasks")
+
             elif task_type == TaskType.RANDOM:
                 # RANDOM: end_date optional, times not needed
-                # If no end_date given → SP will use start_date
                 pass
-
-            # ── FUTURE validations (not active yet) ─────────────
-            # elif task_type == TaskType.DAILY:
-            #     if not data.get('task_end_date'):
-            #         return error_response("task_end_date required for Daily")
-
-            # elif task_type == TaskType.WEEKLY:
-            #     if not data.get('day_of_week'):
-            #         return error_response("day_of_week required for Weekly")
-
-            # elif task_type == TaskType.MONTHLY:
-            #     if not data.get('task_end_date'):
-            #         return error_response("task_end_date required for Monthly")
 
             else:
                 # Unknown task type
                 return error_response(
                     f"Invalid task_type: {task_type}. "
-                    f"Valid: 4 (Random), 5 (Time Bound)")
+                    f"Valid: 1(Daily), 2(Weekly), 3(Monthly), 4(Random), 5(Time Bound)")
             # ────────────────────────────────────────────────────
 
             result = services.create_task(

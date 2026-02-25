@@ -179,6 +179,14 @@
     color: #aaa;
 }
 
+.recurrence-box {
+    padding: 16px;
+    background: #f8f9fc;
+    border: 1px dashed #4361ee44;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
 /* ── Employee search ─────────────────────────────────── */
 
 .search-wrap {
