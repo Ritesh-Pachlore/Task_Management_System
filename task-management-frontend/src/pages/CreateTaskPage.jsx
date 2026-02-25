@@ -83,6 +83,7 @@ const today = new Date().toISOString().split('T')[0];
 const INITIAL_FORM = {
     task_title:        '',
     task_description:  '',
+    attachments: [],
     task_type:         4,          // default → Random
     priority_type:     2,          // default → Medium
     task_start_date:   today,
@@ -223,6 +224,33 @@ const CreateTaskPage = () => {
         toast.info('Keeping original date');
     };
 
+     /* ───────────────── FILE HANDLER ───────────────── */
+
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files);
+
+        const validFiles = [];
+
+        for (let file of files) {
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error(`${file.name} exceeds 5MB limit`);
+                continue;
+            }
+            validFiles.push(file);
+        }
+
+        setForm(prev => ({
+            ...prev,
+            attachments: validFiles,
+        }));
+    };
+
+    const removeFile = (index) => {
+        const updated = [...form.attachments];
+        updated.splice(index, 1);
+        setForm(prev => ({ ...prev, attachments: updated }));
+    };
+
     // ── Client-side validation ───────────────────────────────────
     const validate = () => {
         if (!form.task_title.trim()) {
@@ -302,42 +330,56 @@ const CreateTaskPage = () => {
         // Frontend sends date and time SEPARATELY.
         // SP combines them: "2025-07-15" + "09:00" → 2025-07-15 09:00:00
         // ─────────────────────────────────────────────────────────
-        const payload = {
-            task_title:       form.task_title.trim(),
-            task_description: form.task_description.trim(),
-            task_type:        form.task_type,
-            priority_type:    form.priority_type,
-            task_start_date:  form.task_start_date,
-            task_end_date:    form.task_end_date || form.task_start_date,
-            emp_list:         form.selectedEmployees.join(','),
-        };
+         // ✅ Use FormData instead of payload object
+    const formData = new FormData();
 
-        // Include times only for TIME_BOUND
-        if (form.task_type === 5) {
-            payload.start_time = form.start_time;
-            payload.end_time   = form.end_time;
-        }
+    formData.append('task_title', form.task_title.trim());
+    formData.append('task_description', form.task_description.trim());
+    formData.append('task_type', form.task_type);
+    formData.append('priority_type', form.priority_type);
+    formData.append('task_start_date', form.task_start_date);
+    formData.append(
+        'task_end_date',
+        form.task_end_date || form.task_start_date
+    );
+    formData.append(
+        'emp_list',
+        form.selectedEmployees.join(',')
+    );
 
-        // FUTURE: Weekly
-        // if (form.task_type === 2) {
-        //     payload.day_of_week = form.day_of_week;
-        // }
+    // Include times only for TIME_BOUND
+    if (form.task_type === 5) {
+        formData.append('start_time', form.start_time);
+        formData.append('end_time', form.end_time);
+    }
 
-        setSubmitting(true);
+    // ✅ Append uploaded files
+    form.attachments.forEach(file => {
+        formData.append('attachments', file);
+    });
+
+    setSubmitting(true);
         try {
-            const res = await api.post('/tasks/create/', payload);
-            if (res.data.success) {
-                toast.success('Task created successfully!');
-                navigate('/assigned-by-me');
-            } else {
-                toast.error(res.data.message || 'Failed to create task');
-            }
-        } catch (err) {
-            const msg = err.response?.data?.message || 'Failed to create task';
-            toast.error(msg);
+        const res = await api.post('/tasks/create/', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+
+        if (res.data.success) {
+            toast.success('Task created successfully!');
+            navigate('/assigned-by-me');
+        } else {
+            toast.error(res.data.message || 'Failed to create task');
         }
-        setSubmitting(false);
-    };
+    } catch (err) {
+        const msg =
+            err.response?.data?.message || 'Failed to create task';
+        toast.error(msg);
+    }
+
+    setSubmitting(false);
+};
 
     // ─────────────────────────────────────────────────────────────
     // RENDER
@@ -381,6 +423,39 @@ const CreateTaskPage = () => {
                             onChange={e => setField('task_description', e.target.value)}
                         />
                     </div>
+
+                     {/* Attachments */}
+                    <div className="form-group">
+                        <label className="form-label">
+                            Attach Documents
+                        </label>
+
+                        <input
+                            type="file"
+                            multiple
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            className="form-control"
+                            onChange={handleFileChange}
+                        />
+
+                        {form.attachments.length > 0 && (
+                            <div className="file-preview-list">
+                                {form.attachments.map((file, index) => (
+                                    <div key={index} className="file-preview-item">
+                                        📄 {file.name}
+                                        <button
+                                            type="button"
+                                            onClick={() => removeFile(index)}
+                                            style={{ marginLeft: '10px' }}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
 
                     {/* ══════════════════════════════════════════
                         SECTION 2: Task Type toggle buttons

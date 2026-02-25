@@ -44,6 +44,7 @@ class CreateTaskView(APIView):
     def post(self, request):
         try:
             data      = request.data
+            files = request.FILES.getlist('attachments')
             task_type = int(data.get('task_type', 0))
 
             # ── Validate required base fields ────────────────────
@@ -103,6 +104,7 @@ class CreateTaskView(APIView):
                 task_data       = data,
                 created_by      = request.user.emp_id,
                 created_by_name = request.user.emp_name,
+                attachments     = files,
             )
             return success_response(
                 data    = result,
