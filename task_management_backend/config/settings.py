@@ -8,6 +8,9 @@ Django Settings — STANDALONE MODE
 """
 
 from pathlib import Path
+import os   
+
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -82,7 +85,7 @@ REST_FRAMEWORK = {
         'apps.authentication.token_auth.StandaloneTokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ],
 }
 
@@ -109,6 +112,13 @@ JWT_EXPIRATION_HOURS = 24    # Token valid for 24 hours
 ROOT_URLCONF = 'config.urls'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 STATIC_URL = 'static/'
+
+# ════════════════════════════════════════
+# MEDIA FILES (For Task Attachments)
+# ════════════════════════════════════════
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Kolkata'
 USE_TZ = False   # We use SQL Server's GETDATE()

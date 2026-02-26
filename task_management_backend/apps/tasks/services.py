@@ -12,9 +12,12 @@ from .notifications import (
     notify_status_changed,
     notify_task_extended,
 )
+from django.db import connection
+from django.core.files.storage import default_storage
+from django.conf import settings
 
 
-def create_task(task_data, created_by, created_by_name=""):
+def create_task(task_data, created_by, created_by_name="",attachments=None):
     """
     Create task.
 
@@ -115,6 +118,28 @@ def create_task(task_data, created_by, created_by_name=""):
     ])
 
     if result and result[0].get('success') == 1:
+
+                # 🔥 GET CREATED TASK ID FROM SP RESULT
+        task_id = result[0].get('task_id')
+
+        # 🔥 SAVE ATTACHMENTS IF PRESENT
+        # attachments = task_data.get('attachments')
+
+        if attachments and task_id:
+            with connection.cursor() as cursor:
+                for file in attachments:
+                    
+                    file_path = default_storage.save(
+                        f"task_attachments/{file.name}",
+                        file
+                    )
+
+                    cursor.execute("""
+                        INSERT INTO task_attachments
+                        (task_id, file_name, file_path)
+                        VALUES (%s, %s, %s)
+                    """, [task_id, file.name, file_path])
+
         for eid in task_data['emp_list'].split(','):
             eid = eid.strip()
             if eid:
@@ -127,9 +152,15 @@ def create_task(task_data, created_by, created_by_name=""):
     return result
 
 
+from django.conf import settings
+from django.db import connection
+
+
 def get_tasks(emp_id, view_type, filters=None):
+
+    # 🔹 Step 1: Call SP and store result
     if filters:
-        return call_sp('sp_fetch_task_list', [
+        tasks = call_sp('sp_fetch_task_list', [
             emp_id,
             view_type,
             filters.get('status'),
@@ -142,10 +173,37 @@ def get_tasks(emp_id, view_type, filters=None):
             1 if filters.get('extended_only') else 0,
             filters.get('search'),
         ])
-    return call_sp('sp_fetch_task_list', [
-        emp_id, view_type,
-        None, None, None, None, None, None, 0, 0, None,
-    ])
+    else:
+        tasks = call_sp('sp_fetch_task_list', [
+            emp_id, view_type,
+            None, None, None, None, None, None, 0, 0, None,
+        ])
+
+    # 🔹 Step 2: Attach files to each task
+    if tasks:
+        with connection.cursor() as cursor:
+            for task in tasks:
+
+                task_id = task.get("task_id")
+
+                cursor.execute("""
+                    SELECT file_name, file_path
+                    FROM task_attachments
+                    WHERE task_id = %s
+                """, [task_id])
+
+                rows = cursor.fetchall()
+
+                task["attachments"] = [
+                    {
+                        "file_name": row[0],
+                        "file_url": settings.MEDIA_URL + row[1]
+                    }
+                    for row in rows
+                ]
+
+    # 🔹 Step 3: Return modified result
+    return tasks
 
 
 def update_task_status(execution_log_id, action_type,

@@ -17,7 +17,7 @@ const TASK_TYPES = [
     { value: 3, label: 'Monthly' },
     { value: 4, label: 'Random' },
     { value: 5, label: 'Time Bound' },
-    ];
+];
 
 const PRIORITIES = [
     { value: 1, label: 'Low', color: '#4CAF50', bg: '#E8F5E9' },
@@ -51,6 +51,7 @@ const INITIAL_FORM = {
     weekly_days: [],
     monthly_day_of_month: '',
     selectedEmployees: [],
+    attachments: [],
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -176,6 +177,34 @@ const CreateTaskPage = () => {
         return start.toISOString().split('T')[0];
     };
 
+    /* ───────────────── FILE HANDLER ───────────────── */
+
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files);
+
+        const validFiles = [];
+
+        for (let file of files) {
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error(`${file.name} exceeds 5MB limit`);
+                continue;
+            }
+            validFiles.push(file);
+        }
+
+        setForm(prev => ({
+            ...prev,
+            attachments: validFiles,
+        }));
+    };
+
+    const removeFile = (index) => {
+        const updated = [...form.attachments];
+        updated.splice(index, 1);
+        setForm(prev => ({ ...prev, attachments: updated }));
+    };
+
+    // ── Client-side validation ───────────────────────────────────
     const validate = () => {
         if (!form.task_title.trim()) {
             toast.error('Task title is required');
@@ -210,46 +239,62 @@ const CreateTaskPage = () => {
         e.preventDefault();
         if (!validate()) return;
 
-        let finalStartDate = form.task_start_date;
-        if (form.task_type === 1) finalStartDate = form.task_start_date || todayStr;
-        if (form.task_type === 2) finalStartDate = calculateWeeklyStartDate(form.weekly_days);
-
-        const payload = {
-            task_title: form.task_title.trim(),
-            task_description: form.task_description.trim(),
-            task_type: form.task_type,
-            priority_type: form.priority_type,
-            task_start_date: finalStartDate,
-            task_end_date: form.task_end_date || ([1, 2, 3].includes(form.task_type) ? INFINITE_DATE : finalStartDate),
-            emp_list: form.selectedEmployees.join(','),
-        };
-
-        if (form.task_type === 5) {
-            payload.start_time = form.start_time;
-            payload.end_time = form.end_time;
-        }
-
-        if ([1, 2, 3].includes(form.task_type)) {
-            payload.recurrence_type = String(form.task_type);
-            payload.recurrence_end_date = form.recurrence_end_date || INFINITE_DATE;
-
-            // Mapping logic as requested: 0 when not applicable
-            if (form.task_type === 1) { // Daily
-                payload.weekly_days = '0';
-                payload.monthly_day_of_month = 0;
-            } else if (form.task_type === 2) { // Weekly
-                payload.weekly_days = form.weekly_days.join(',');
-                payload.monthly_day_of_month = 0;
-            } else if (form.task_type === 3) { // Monthly
-                payload.weekly_days = '0';
-                const d = new Date(finalStartDate);
-                payload.monthly_day_of_month = isNaN(d.getDate()) ? parseInt(finalStartDate.split('-')[2] || 0) : d.getDate();
-            }
-        }
-
         setSubmitting(true);
+
         try {
-            const res = await api.post('/tasks/create/', payload);
+            let finalStartDate = form.task_start_date;
+            if (form.task_type === 1) finalStartDate = form.task_start_date || todayStr;
+            if (form.task_type === 2) finalStartDate = calculateWeeklyStartDate(form.weekly_days);
+
+            const formData = new FormData();
+            formData.append('task_title', form.task_title.trim());
+            formData.append('task_description', form.task_description.trim());
+            formData.append('task_type', form.task_type);
+            formData.append('priority_type', form.priority_type);
+            formData.append('task_start_date', finalStartDate);
+
+            // End Date Logic
+            const endDate = form.task_end_date || ([1, 2, 3].includes(form.task_type) ? INFINITE_DATE : finalStartDate);
+            formData.append('task_end_date', endDate);
+
+            formData.append('emp_list', form.selectedEmployees.join(','));
+
+            // Recurrence Details
+            if ([1, 2, 3].includes(form.task_type)) {
+                formData.append('recurrence_type', String(form.task_type));
+                formData.append('recurrence_end_date', form.recurrence_end_date || INFINITE_DATE);
+
+                if (form.task_type === 1) { // Daily
+                    formData.append('weekly_days', '0');
+                    formData.append('monthly_day_of_month', 0);
+                } else if (form.task_type === 2) { // Weekly
+                    formData.append('weekly_days', form.weekly_days.join(','));
+                    formData.append('monthly_day_of_month', 0);
+                } else if (form.task_type === 3) { // Monthly
+                    formData.append('weekly_days', '0');
+                    const d = new Date(finalStartDate);
+                    const dom = isNaN(d.getDate()) ? parseInt(finalStartDate.split('-')[2] || 0) : d.getDate();
+                    formData.append('monthly_day_of_month', dom);
+                }
+            }
+
+            // Time Bound Details
+            if (form.task_type === 5) {
+                formData.append('start_time', form.start_time);
+                formData.append('end_time', form.end_time);
+            }
+
+            // Attachments
+            if (form.attachments && form.attachments.length > 0) {
+                form.attachments.forEach(file => {
+                    formData.append('attachments', file);
+                });
+            }
+
+            const res = await api.post('/tasks/create/', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
             if (res.data.success) {
                 toast.success('Task created successfully!');
                 navigate('/assigned-by-me');
@@ -257,9 +302,12 @@ const CreateTaskPage = () => {
                 toast.error(res.data.message || 'Failed to create task');
             }
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Error occurred');
+            const msg = err.response?.data?.message || 'Error occurred while creating task';
+            toast.error(msg);
+            console.error('Submission error:', err);
+        } finally {
+            setSubmitting(false);
         }
-        setSubmitting(false);
     };
 
     return (
@@ -294,6 +342,42 @@ const CreateTaskPage = () => {
                     </div>
 
                     {/* Task Type */}
+                    {/* Attachments */}
+                    <div className="form-group">
+                        <label className="form-label">
+                            Attach Documents
+                        </label>
+
+                        <input
+                            type="file"
+                            multiple
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png, .xlsx, .xls"
+                            className="form-control"
+                            onChange={handleFileChange}
+                        />
+
+                        {form.attachments?.length > 0 && (
+                            <div className="file-preview-list">
+                                {form.attachments.map((file, index) => (
+                                    <div key={index} className="file-preview-item">
+                                        📄 {file.name}
+                                        <button
+                                            type="button"
+                                            onClick={() => removeFile(index)}
+                                            style={{ marginLeft: '10px' }}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+
+                    {/* ══════════════════════════════════════════
+                        SECTION 2: Task Type toggle buttons
+                    ══════════════════════════════════════════ */}
                     <div className="form-group">
                         <label className="form-label">Task Type <span className="req">*</span></label>
                         <div className="toggle-group">
@@ -417,7 +501,7 @@ const CreateTaskPage = () => {
                             />
                         </div>
 
-                        {showEmpList && (
+                        {/* {showEmpList && (
                             <div className="emp-list-box">
                                 {empLoading ? (
                                     <div className="emp-list-state">Loading...</div>
@@ -427,8 +511,57 @@ const CreateTaskPage = () => {
                                         return (
                                             <label key={emp.emp_id} className={`emp-row ${checked ? 'emp-row-checked' : ''}`}>
                                                 <input type="checkbox" checked={checked} onChange={() => toggleEmployee(emp.emp_id)} />
-                                                <span className="emp-row-name">{emp.emp_name}</span>
+                                                <span className="emp-row-name">
+                                                    {emp.emp_name}
+                                                    <small style={{ marginLeft: '8px', color: '#888' }}>
+                                                        ({emp.emp_department || 'N/A'})
+                                                    </small>
+                                                </span>
                                                 <span className="emp-row-id">#{emp.emp_id}</span>
+                                            </label>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        )} */}
+
+                        {showEmpList && (
+                            <div className="emp-list-box">
+                                {empLoading ? (
+                                    <div className="emp-list-state">
+                                        Loading employees...
+                                    </div>
+                                ) : employees.length === 0 ? (
+                                    <div className="emp-list-state">
+                                        No employees found
+                                    </div>
+                                ) : (
+                                    employees.map(emp => {
+                                        const isChecked =
+                                            form.selectedEmployees.includes(
+                                                emp.emp_id
+                                            );
+
+                                        return (
+                                            <label
+                                                key={emp.emp_id}
+                                                className={`emp-row ${isChecked
+                                                        ? 'emp-row-checked'
+                                                        : ''
+                                                    }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() =>
+                                                        toggleEmployee(
+                                                            emp.emp_id
+                                                        )
+                                                    }
+                                                />
+                                                <span>
+                                                    {emp.emp_name}{emp.emp_department ? ` — ${emp.emp_department}` : ''}
+                                                </span>
                                             </label>
                                         );
                                     })

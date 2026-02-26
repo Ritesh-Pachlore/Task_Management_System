@@ -103,6 +103,25 @@ const TaskCard = ({ task, viewType, onAction }) => {
             {task.task_description && (
                 <p className="task-card-desc">{task.task_description}</p>
             )}
+            {/* Attachments Section */}
+{task.attachments && task.attachments.length > 0 && (
+    <div className="task-attachments" style={{ marginTop: 10 }}>
+        <strong style={{ fontSize: 13 }}>Attachments:</strong>
+        {task.attachments.map((file, index) => (
+            <div key={index} style={{ marginTop: 4 }}>
+                <a
+                    href={`http://localhost:8001${file.file_url}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 13, color: '#007bff' }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    📎 {file.file_name}
+                </a>
+            </div>
+        ))}
+    </div>
+)}
 
             <div className="task-card-meta">
                 <div className="task-meta-item">
