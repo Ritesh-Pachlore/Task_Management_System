@@ -146,6 +146,19 @@ const DashboardPage = () => {
     if (!data) return null;
 
     const counts = data.overall_counts || {};
+    const getDeptName = (item) => {
+        if (!item) return '';
+        const candidates = [
+            item.emp_department,
+            item.department,
+            item.department_name,
+            item.dept_name,
+            item.dep_name,
+            item.dept,
+        ];
+        const found = candidates.find(c => c && c !== 'N/A');
+        return found || '';
+    };
 
     const statsCards = [
         { label: 'Total', value: counts.total_tasks, icon: <MdAssignment />, color: '#4361ee' },
@@ -399,6 +412,7 @@ const DashboardPage = () => {
                                     <thead>
                                         <tr>
                                             <th>Employee</th>
+                                            <th>Department</th>
                                             <th>Task Title</th>
                                             <th>Description</th>
                                             <th>Priority</th>
@@ -432,8 +446,29 @@ const DashboardPage = () => {
                                                                 }
                                                             }}
                                                         >
-                                                            {task.emp_name || 'Unassigned'}
+                                                            {/* {task.emp_name || 'Unassigned'}
                                                         </td>
+                                                        <td>{task.task_title}</td>
+                                                        <td style={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {task.task_description}
+                                                        </td>
+                                                        <td>
+                                                            <span style={{
+                                                                padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                                                                background: task.priority_type === 3 ? '#ffebee' : task.priority_type === 2 ? '#fff3e0' : '#e8f5e9',
+                                                                color: task.priority_type === 3 ? '#f44336' : task.priority_type === 2 ? '#ff9800' : '#4caf50'
+                                                            }}>
+                                                                {task.priority_type === 3 ? 'HIGH' : task.priority_type === 2 ? 'MEDIUM' : 'LOW'}
+                                                            </span>
+                                                        </td>
+                                                        <td>{formatDate(task.effective_deadline)}</td>
+                                                        <td style={{ color: isOverdue ? '#f44336' : '#999', fontWeight: isOverdue ? 600 : 400 }}>
+                                                            {getDaysText(task.days_remaining) || '-'}
+                                                        </td>
+                                                    </tr> */}
+                                                    {task.emp_name || 'Unassigned'}
+                                                        </td>
+                                                            <td>{getDeptName(task) || 'N/A'}</td>
                                                         <td>{task.task_title}</td>
                                                         <td style={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                             {task.task_description}
@@ -536,6 +571,7 @@ const DashboardPage = () => {
                                 <thead>
                                     <tr>
                                         <th>Employee</th>
+                                        <th>Department</th>
                                         <th>Total</th>
                                         <th>Completed</th>
                                         <th>Pending</th>
@@ -559,6 +595,7 @@ const DashboardPage = () => {
                                             >
                                                 {emp.emp_name}
                                             </td>
+                                            <td>{getDeptName(emp) || 'N/A'}</td>   
                                             <td>{emp.total_tasks}</td>
                                             <td style={{ color: '#4CAF50' }}>
                                                 {emp.completed}

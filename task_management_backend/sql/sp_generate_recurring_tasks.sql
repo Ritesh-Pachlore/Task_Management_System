@@ -231,12 +231,12 @@ BEGIN
                 -- Create audit history entries
                 INSERT INTO task_execution_history (
                     execution_log_id, action_type, action_by,
-                    remarks, extended_date, action_at
+                    remarks, action_at
                 )
                 SELECT 
                     el.id, 0, el.assigned_by,
                     'Auto-assigned by recurring task scheduler',
-                    NULL, @now
+                    @now
                 FROM task_execution_log el
                 WHERE el.task_id = @task_id
                   AND CAST(el.created_at AS DATE) = @target_date

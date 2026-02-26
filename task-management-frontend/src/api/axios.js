@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Points to your Django server
 const api = axios.create({
-    baseURL: 'http://172.16.24.128:8001/api',
+    baseURL: 'http://localhost:8001/api',//'http://172.16.24.225:8001/api',//'http://localhost:8001/api', 
     headers: {
         'Content-Type': 'application/json',
     },

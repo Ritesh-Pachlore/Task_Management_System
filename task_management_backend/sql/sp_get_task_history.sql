@@ -31,7 +31,6 @@ BEGIN
          FROM inout_aems..staffmst WHERE EMP_ID = h.action_by
         ) AS action_by_name,
         h.remarks,
-        h.extended_date,
         h.action_at
     FROM task_execution_history h
     WHERE h.execution_log_id = @execution_log_id

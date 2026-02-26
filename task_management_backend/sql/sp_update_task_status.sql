@@ -1,5 +1,10 @@
 USE [DButilities]
 GO
+/****** Object:  StoredProcedure [dbo].[sp_update_task_status]    Script Date: 26-02-2026 09:40:38 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 
 ALTER PROCEDURE [dbo].[sp_update_task_status]
     @execution_log_id  BIGINT,
@@ -21,7 +26,8 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        SELECT
+        -- Fetch execution row
+        SELECT 
             @current_status = status,
             @task_id = task_id,
             @emp_id = emp_id,
@@ -38,18 +44,19 @@ BEGIN
             RETURN;
         END
 
-        -- Determine new status
-        SET @new_status = CASE @action_type
-            WHEN 1 THEN 1  -- Started
-            WHEN 2 THEN 2
-            WHEN 3 THEN 3  -- Completed
-            WHEN 4 THEN 4  -- Rejected
-            WHEN 5 THEN 5
-            WHEN 6 THEN 6
-            WHEN 7 THEN 7
-            WHEN 8 THEN @current_status -- Extended (status unchanged)
-            ELSE -1
-        END;
+        -- Map action to new status
+        SET @new_status =
+            CASE @action_type
+                WHEN 1 THEN 1   -- STARTED
+                WHEN 2 THEN 2   -- SUBMITTED
+                WHEN 3 THEN 3   -- COMPLETED
+                WHEN 4 THEN 4   -- REJECTED
+                WHEN 5 THEN 5   -- RESUBMITTED
+                WHEN 6 THEN 6   -- CANCELLED
+                WHEN 7 THEN 7   -- ON_HOLD
+                WHEN 8 THEN @current_status -- EXTENDED (no status change)
+                ELSE -1
+            END;
 
         IF @new_status = -1
         BEGIN
@@ -61,17 +68,20 @@ BEGIN
         END
 
         -- STARTED
-        IF @action_type = 1  
+        IF @action_type = 1
         BEGIN
             UPDATE task_execution_log
             SET status = @new_status,
-                started_at = CASE WHEN started_at IS NULL THEN @now ELSE started_at END,
+                started_at = CASE 
+                                WHEN started_at IS NULL THEN @now 
+                                ELSE started_at 
+                             END,
                 updated_at = @now
             WHERE id = @execution_log_id;
         END
 
         -- REJECTED
-        ELSE IF @action_type = 4  
+        ELSE IF @action_type = 4
         BEGIN
             UPDATE task_execution_log
             SET status = @new_status,
@@ -81,7 +91,7 @@ BEGIN
         END
 
         -- EXTENDED
-        ELSE IF @action_type = 8  
+        ELSE IF @action_type = 8
         BEGIN
             IF @extended_date IS NULL
             BEGIN
@@ -92,13 +102,14 @@ BEGIN
                 RETURN;
             END
 
+            -- Save exactly what user selected (no auto shift)
             UPDATE task_execution_log
             SET extended_date = @extended_date,
                 updated_at = @now
             WHERE id = @execution_log_id;
         END
 
-        -- ALL OTHER STATUS CHANGES
+        -- All other status changes
         ELSE
         BEGIN
             UPDATE task_execution_log
@@ -107,7 +118,7 @@ BEGIN
             WHERE id = @execution_log_id;
         END
 
-        -- Insert into history with smart default remarks
+        -- Insert history with smart default remarks
         INSERT INTO task_execution_history (
             execution_log_id,
             action_type,
@@ -122,13 +133,16 @@ BEGIN
             CASE
                 -- EXTENDED
                 WHEN @action_type = 8 THEN
-                    CONCAT('Deadline extended to ',
-                           CONVERT(VARCHAR, @extended_date, 120),
-                           CASE WHEN @remarks IS NOT NULL
-                                    AND LTRIM(RTRIM(@remarks)) <> ''
-                                THEN CONCAT(' - ', @remarks)
-                                ELSE ''
-                           END)
+                    CONCAT(
+                        'Deadline extended to ',
+                        CONVERT(VARCHAR(19), @extended_date, 120),
+                        CASE 
+                            WHEN @remarks IS NOT NULL 
+                                 AND LTRIM(RTRIM(@remarks)) <> ''
+                            THEN CONCAT(' - ', @remarks)
+                            ELSE ''
+                        END
+                    )
 
                 -- STARTED default
                 WHEN @action_type = 1
@@ -145,7 +159,6 @@ BEGIN
                      AND (@remarks IS NULL OR LTRIM(RTRIM(@remarks)) = '')
                      THEN 'Task completed'
 
-                -- Default
                 ELSE @remarks
             END,
             @now
@@ -170,4 +183,3 @@ BEGIN
                NULL AS action_type, NULL AS new_status;
     END CATCH
 END
-GO

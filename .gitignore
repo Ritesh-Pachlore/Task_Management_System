@@ -6,9 +6,9 @@ __pycache__/
 
 # Virtual environment
 task_management_system/
-venv/
-env/
-.env
+# venv/
+# env/
+# .env
 
 # Django
 db.sqlite3

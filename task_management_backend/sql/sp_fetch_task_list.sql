@@ -1,13 +1,11 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_fetch_task_list]    Script Date: 24-02-2026 09:18:37 ******/
+/****** Object:  StoredProcedure [dbo].[sp_fetch_task_list]    Script Date: 26-02-2026 10:03:01 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
--- ═══════════════════════════════════════════════════════════════
--- UPDATE 2: sp_fetch_task_list (add emp_department)
--- ═══════════════════════════════════════════════════════════════
+
 ALTER PROCEDURE [dbo].[sp_fetch_task_list]
     @emp_id               BIGINT,
     @view_type            NVARCHAR(50),
@@ -35,7 +33,7 @@ BEGIN
             WHEN 3 THEN 'MONTHLY'
             WHEN 4 THEN 'RANDOM'
             WHEN 5 THEN 'TIME_BOUND'
-            ELSE        'UNKNOWN'
+            ELSE 'UNKNOWN'
         END AS task_type_name,
 
         td.priority_type,
@@ -45,70 +43,79 @@ BEGIN
             WHEN 3 THEN 'HIGH'
         END AS priority_name,
 
-        -- Full datetime (as stored)
         td.task_start_date,
         td.task_end_date,
 
-        -- ── Extracted date parts (for display) ──────────────────
         CAST(td.task_start_date AS DATE) AS start_date_only,
         CAST(td.task_end_date   AS DATE) AS end_date_only,
 
-        -- ── Extracted time parts (for TIME_BOUND display) ───────
         CONVERT(NVARCHAR(8), td.task_start_date, 108) AS start_time_only,
         CONVERT(NVARCHAR(8), td.task_end_date,   108) AS end_time_only,
 
-        -- ── Execution log ────────────────────────────────────────
         el.id AS execution_log_id,
         el.emp_id,
+
         (SELECT STF_FRNAME + ' ' + STF_LSNAME
          FROM inout_aems..staffmst
-         WHERE EMP_ID = el.emp_id)        AS emp_name,
-        ISNULL((SELECT d.DEP_NAME FROM inout_aems..staffmst s LEFT JOIN inout_aems..deptmst d ON s.DEP_ID = d.DEP_ID WHERE s.EMP_ID = el.emp_id), 'N/A') AS emp_department,
+         WHERE EMP_ID = el.emp_id) AS emp_name,
+
+        ISNULL(
+            (SELECT d.DEP_NAME
+             FROM inout_aems..staffmst s
+             LEFT JOIN inout_aems..deptmst d ON s.DEP_ID = d.DEP_ID
+             WHERE s.EMP_ID = el.emp_id),
+            'N/A'
+        ) AS emp_department,
+
         el.assigned_by,
+
         (SELECT STF_FRNAME + ' ' + STF_LSNAME
          FROM inout_aems..staffmst
-         WHERE EMP_ID = el.assigned_by)   AS assigned_by_name,
+         WHERE EMP_ID = el.assigned_by) AS assigned_by_name,
 
         el.status,
         CASE el.status
-            WHEN 0 THEN 'ASSIGNED'    WHEN 1 THEN 'STARTED'
-            WHEN 2 THEN 'SUBMITTED'   WHEN 3 THEN 'APPROVED'
-            WHEN 4 THEN 'REJECTED'    WHEN 5 THEN 'RESUBMITTED'
-            WHEN 6 THEN 'CANCELLED'   WHEN 7 THEN 'ON_HOLD'
+            WHEN 0 THEN 'ASSIGNED'
+            WHEN 1 THEN 'STARTED'
+            WHEN 2 THEN 'SUBMITTED'
+            WHEN 3 THEN 'APPROVED'
+            WHEN 4 THEN 'REJECTED'
+            WHEN 5 THEN 'RESUBMITTED'
+            WHEN 6 THEN 'CANCELLED'
+          --WHEN 7 THEN 'ON_HOLD'
         END AS status_name,
 
         el.started_at,
         el.extended_date,
         el.rejection_count,
 
-        -- ── Deadline calculations ────────────────────────────────
         COALESCE(el.extended_date, td.task_end_date) AS effective_deadline,
 
         CASE
+            WHEN el.status IN (3,6) THEN NULL
+            ELSE DATEDIFF(DAY, GETDATE(),
+                COALESCE(el.extended_date, td.task_end_date))
+        END AS days_remaining,
+
+        CASE
             WHEN COALESCE(el.extended_date, td.task_end_date) < GETDATE()
-                 AND el.status NOT IN (3, 6)
+                 AND el.status NOT IN (3,6)
             THEN 1 ELSE 0
         END AS is_overdue,
 
-        CASE
-            WHEN el.status IN (3, 6) THEN NULL -- Completed or Cancelled tasks
-            ELSE DATEDIFF(day, GETDATE(), COALESCE(el.extended_date, td.task_end_date))
-        END AS days_remaining,
-
-        -- ── Recurrence info (for display) ────────────────────────
         rp.weekly_days,
         rp.monthly_day_of_month,
 
         @view_type AS view_type
 
     FROM task_details td
-    LEFT JOIN task_execution_log el ON td.task_id = el.task_id
-    LEFT JOIN recurrence_pattern rp ON td.task_id = rp.task_id
+    INNER JOIN task_execution_log el ON td.task_id = el.task_id
+    LEFT JOIN recurrence_pattern rp  ON td.task_id = rp.task_id
 
     WHERE td.is_active = 1
       AND (
-            (@view_type = 'SELF'           AND el.emp_id      = @emp_id)
-         OR (@view_type = 'ASSIGNED_BY_ME' AND td.created_by = @emp_id)
+            (@view_type = 'SELF' AND el.emp_id = @emp_id)
+         OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id)
           )
       AND (@filter_status        IS NULL OR el.status        = @filter_status)
       AND (@filter_priority      IS NULL OR td.priority_type = @filter_priority)
@@ -119,14 +126,15 @@ BEGIN
       AND (@filter_date_to       IS NULL
            OR COALESCE(el.extended_date, td.task_end_date) <= @filter_date_to)
       AND (@filter_overdue_only  = 0
-           OR (    COALESCE(el.extended_date, td.task_end_date) < GETDATE()
-               AND el.status NOT IN (3, 6)))
+           OR (COALESCE(el.extended_date, td.task_end_date) < GETDATE()
+               AND el.status NOT IN (3,6)))
       AND (@filter_extended_only = 0 OR el.extended_date IS NOT NULL)
       AND (@filter_search        IS NULL
            OR td.task_title LIKE '%' + @filter_search + '%'
            OR (SELECT STF_FRNAME + ' ' + STF_LSNAME
                FROM inout_aems..staffmst
-               WHERE EMP_ID = el.emp_id) LIKE '%' + @filter_search + '%')
+               WHERE EMP_ID = el.emp_id)
+              LIKE '%' + @filter_search + '%')
 
     ORDER BY el.updated_at DESC;
 END

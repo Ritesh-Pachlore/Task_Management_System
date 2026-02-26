@@ -67,7 +67,7 @@ BEGIN
         action_type        INT              NOT NULL,
         action_by          BIGINT           NOT NULL,
         remarks            NVARCHAR(MAX)    NULL,
-        extended_date      DATETIME         NULL,
+
         action_at          DATETIME         NOT NULL DEFAULT GETDATE(),
 
         CONSTRAINT FK_history_exec_log 

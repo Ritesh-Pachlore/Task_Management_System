@@ -126,11 +126,11 @@ BEGIN
 
                 INSERT INTO task_execution_history (
                     execution_log_id, action_type, action_by,
-                    remarks, extended_date, action_at
+                    remarks, action_at
                 )
                 VALUES (
                     @exec_log_id, 0, @created_by,
-                    'Task assigned', NULL, @now
+                    'Task assigned', @now
                 );
 
                 FETCH NEXT FROM emp_cursor INTO @emp_id;
