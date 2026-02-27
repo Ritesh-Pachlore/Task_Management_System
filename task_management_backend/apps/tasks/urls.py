@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 
+
 urlpatterns = [
     path('create/',              views.CreateTaskView.as_view()),
     path('my-tasks/',            views.MyTasksView.as_view()),
@@ -11,4 +12,5 @@ urlpatterns = [
     path('dashboard/',           views.DashboardView.as_view()),
     path('check-date/',          views.CheckDateView.as_view()),
     path('affected-by-holiday/', views.AffectedByHolidayView.as_view()),
+     path('edit/',                views.EditTaskView.as_view()), 
 ]

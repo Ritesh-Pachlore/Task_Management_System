@@ -433,7 +433,7 @@ const CreateTaskPage = () => {
                         <input
                             type="file"
                             multiple
-                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
                             className="form-control"
                             onChange={handleFileChange}
                         />

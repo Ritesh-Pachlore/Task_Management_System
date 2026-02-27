@@ -1,5 +1,7 @@
 # apps/tasks/views.py
 
+
+
 from rest_framework.views import APIView
 from rest_framework.decorators import authentication_classes
 from rest_framework.permissions import IsAuthenticated
@@ -8,6 +10,15 @@ from utils.constants import TaskType
 from . import services
 from .holiday_helper import get_shift_info
 from apps.authentication.token_auth import StandaloneTokenAuthentication
+
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
+# Convert cursor results to list of dicts
+def dictfetchall(cursor):
+    "Return all rows from a cursor as a list of dicts"
+    columns = [col[0] for col in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
 @authentication_classes([StandaloneTokenAuthentication])
@@ -41,7 +52,10 @@ class CreateTaskView(APIView):
     authentication_classes = [StandaloneTokenAuthentication]
     permission_classes = [IsAuthenticated]
 
+    
+
     def post(self, request):
+        
         try:
             data      = request.data
             files = request.FILES.getlist('attachments')
@@ -113,6 +127,51 @@ class CreateTaskView(APIView):
         except Exception as e:
             return error_response(message=str(e))
 
+@authentication_classes([StandaloneTokenAuthentication])
+class EditTaskView(APIView):
+    """POST /api/tasks/edit/"""
+    authentication_classes = [StandaloneTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @method_decorator(csrf_exempt)
+    def post(self, request):
+        try:
+            data = request.data
+            execution_log_id = data.get("execution_log_id")
+            title = data.get("title")
+            description = data.get("description")
+            emp_list = data.get("emp_list")
+            deadline = data.get("deadline")
+
+            # Validation
+            if not execution_log_id:
+                return error_response("execution_log_id required")
+            if not title:
+                return error_response("title is required")
+            if not description:
+                return error_response("description is required")
+
+            # Call the SP
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    EXEC dbo.sp_edit_task
+                        @execution_log_id=%s,
+                        @title=%s,
+                        @description=%s,
+                        @emp_list=%s,
+                        @deadline=%s
+                    """,
+                    [execution_log_id, title, description, emp_list, deadline]
+                )
+                result = dictfetchall(cursor)
+
+            if result and result[0].get("success") == 1:
+                return success_response(data=result[0], message="Task updated successfully")
+            return error_response(result[0].get("message") if result else "Task update failed")
+        except Exception as e:
+            return error_response(str(e))
 
 @authentication_classes([StandaloneTokenAuthentication])
 class MyTasksView(APIView):

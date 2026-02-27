@@ -16,29 +16,32 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
     const empListRef = useRef(null);
     const empInputRef = useRef(null);
 
+    // Initialize modal data when opening
     useEffect(() => {
         if (actionModal?.actionType === 'edit' && actionModal.task) {
             setTaskTitle(actionModal.task.task_title || '');
             setTaskDescription(actionModal.task.task_description || '');
             setExtendedDate(actionModal.task.effective_deadline || '');
-            // pre-select existing assigned emp if available
+
+            // Pre-select employees
             const assigned = actionModal.task.emp_list || actionModal.task.assigned_emp_list || '';
             if (assigned) {
                 const arr = String(assigned).split(',').map(s => parseInt(s)).filter(Boolean);
                 setSelectedEmployees(arr);
             }
-            // pre-load employee list so previous assignees' names can be shown
-            fetchEmployees('');
+
+            fetchEmployees(''); // load employee names
         }
     }, [actionModal]);
 
+    // Employee search
     useEffect(() => {
         if (actionModal?.actionType !== 'edit') return;
         const timer = setTimeout(() => fetchEmployees(empSearch), 250);
         return () => clearTimeout(timer);
     }, [empSearch, actionModal]);
 
-    // Close employee list when clicking outside the input/list
+    // Close employee list when clicking outside
     useEffect(() => {
         const handler = (e) => {
             if (!showEmpList) return;
@@ -62,15 +65,48 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
         setEmpLoading(false);
     };
 
-    const handleSubmit = () => {
-        onSubmit({
-            remarks,
-            extended_date: extendedDate,
-            title: taskTitle,
-            description: taskDescription,
-            emp_list: selectedEmployees.length > 0 ? selectedEmployees.join(',') : undefined,
-        });
+    const toggleEmployee = (id) => {
+        setSelectedEmployees(prev =>
+            prev.includes(id)
+                ? prev.filter(empId => empId !== id)
+                : [...prev, id]
+        );
     };
+
+    // ✅ Fixed handleSubmit for edit action
+    const handleSubmit = () => {
+        const payload = {
+            execution_log_id: actionModal.task?.execution_log_id, // required
+            title: taskTitle.trim(),
+            description: taskDescription.trim(),
+        };
+
+        if (selectedEmployees.length > 0) {
+            payload.emp_list = selectedEmployees.join(',');
+        }
+
+        if (extendedDate) {
+            payload.deadline = extendedDate;
+        }
+
+        // Validate required fields before sending
+        if (!payload.execution_log_id) {
+            toast.error("Task not found");
+            return;
+        }
+        if (!payload.title) {
+            toast.error("Title is required");
+            return;
+        }
+        if (!payload.description) {
+            toast.error("Description is required");
+            return;
+        }
+
+        onSubmit(payload);
+    };
+
+    const clearSearch = () => setEmpSearch('');
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -82,7 +118,7 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
 
                 {actionModal?.actionType === 'edit' && (
                     <>
-                        {/* Previously assigned */}
+                        {/* Previously assigned employees */}
                         <div className="form-group">
                             <label>Previously assigned to</label>
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -98,19 +134,39 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
                             </div>
                         </div>
 
+                        {/* Add/Remove Employees */}
                         <div className="form-group">
                             <label>Add/Remove Employees</label>
-                            <input
-                                ref={empInputRef}
-                                type="text"
-                                className="form-control"
-                                placeholder="Search employees to add..."
-                                value={empSearch}
-                                onFocus={() => setShowEmpList(true)}
-                                onChange={(e) => { setEmpSearch(e.target.value); setShowEmpList(true); }}
-                            />
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    ref={empInputRef}
+                                    type="text"
+                                    className="form-control"
+                                    placeholder="Search employees to add..."
+                                    value={empSearch}
+                                    onFocus={() => setShowEmpList(true)}
+                                    onChange={(e) => { setEmpSearch(e.target.value); setShowEmpList(true); }}
+                                />
+                                {empSearch && (
+                                    <button
+                                        type="button"
+                                        onClick={clearSearch}
+                                        style={{
+                                            position: 'absolute',
+                                            right: 8,
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            border: 'none',
+                                            background: 'transparent',
+                                            cursor: 'pointer',
+                                            fontSize: 16,
+                                            fontWeight: 'bold',
+                                            color: '#888'
+                                        }}
+                                    >×</button>
+                                )}
+                            </div>
 
-                            {/* Selected employees shown immediately */}
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
                                 {selectedEmployees.map(id => {
                                     const e = employees.find(x => x.emp_id === id);
@@ -134,9 +190,7 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
                                                     <input
                                                         type="checkbox"
                                                         checked={checked}
-                                                        onChange={() => {
-                                                            setSelectedEmployees(prev => checked ? prev.filter(id => id !== emp.emp_id) : [...prev, emp.emp_id]);
-                                                        }}
+                                                        onChange={() => toggleEmployee(emp.emp_id)}
                                                     />
                                                     <span>{emp.emp_name}{emp.emp_department ? ` — ${emp.emp_department}` : ''}</span>
                                                 </label>
@@ -146,6 +200,19 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
                                 </div>
                             )}
                         </div>
+
+                        {/* Title & Description */}
+                        <div className="form-group">
+                            <label>Title</label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                value={taskTitle}
+                                onChange={(e) => setTaskTitle(e.target.value)}
+                                placeholder="Task title"
+                            />
+                        </div>
+
                         <div className="form-group">
                             <label>Description</label>
                             <textarea
@@ -156,6 +223,7 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
                                 rows={3}
                             />
                         </div>
+
                         <div className="form-group">
                             <label>Deadline</label>
                             <input

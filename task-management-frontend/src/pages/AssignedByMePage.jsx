@@ -70,74 +70,89 @@ const AssignedByMePage = () => {
     };
 
     const submitAction = async ({ remarks, extended_date, title, description, emp_list }) => {
-        try {
-            if (actionModal.actionType === 'edit') {
-                const response = await api.post('/tasks/edit/', {
-                    execution_log_id: actionModal.task.execution_log_id,
-                    title,
-                    description,
-                    deadline: extended_date,
-                    emp_list: emp_list, // comma-separated ids (optional)
-                });
-                if (response.data.success) {
-                    toast.success('Task updated successfully!');
-                    setActionModal(null);
-                    fetchTasks();
-                } else {
-                    toast.error(response.data.message);
-                }
+    try {
+        if (actionModal.actionType === 'edit') {
+            // ✅ Validate required fields
+            if (!title?.trim() || !description?.trim()) {
+                toast.error("Title and Description are required");
                 return;
             }
 
-            if (actionModal.actionType === 'extend') {
-                if (!extended_date) {
-                    toast.error('Please select a date');
-                    return;
-                }
+            // ✅ Prepare payload
+            const payload = {
+                execution_log_id: actionModal.task.execution_log_id,
+                title: title.trim(),
+                description: description.trim(),
+            };
 
-                const checkResponse = await api.get(
-                    `/tasks/check-date/?date=${extended_date}`
-                );
-                const checkData = checkResponse.data.data;
+            if (emp_list?.trim()) payload.emp_list = emp_list.trim();
+            if (extended_date?.trim()) payload.deadline = extended_date.trim();
 
-                if (checkData.needs_shift) {
-                    setPendingExtend({
-                        execution_log_id: actionModal.task.execution_log_id,
-                        remarks,
-                    });
-                    setShiftInfo(checkData);
-                    setActionModal(null);
-                    return;
-                }
+            // ✅ Send POST to backend
+            const response = await api.post('/tasks/edit/', payload);
 
-                const response = await api.post('/tasks/extend/', {
-                    execution_log_id: actionModal.task.execution_log_id,
-                    extended_date,
-                    remarks,
-                });
-                if (response.data.success) {
-                    toast.success('Deadline extended!');
-                    setActionModal(null);
-                    fetchTasks();
-                }
+            if (response.data.success) {
+                toast.success('Task updated successfully!');
+                setActionModal(null);
+                fetchTasks(); // refresh list
             } else {
-                const response = await api.post('/tasks/update-status/', {
+                toast.error(response.data.message || "Failed to update task");
+            }
+            return;
+        }
+
+        // ---------------- EXTEND TASK ----------------
+        if (actionModal.actionType === 'extend') {
+            if (!extended_date) {
+                toast.error('Please select a date');
+                return;
+            }
+
+            const checkResponse = await api.get(
+                `/tasks/check-date/?date=${extended_date}`
+            );
+            const checkData = checkResponse.data.data;
+
+            if (checkData.needs_shift) {
+                setPendingExtend({
                     execution_log_id: actionModal.task.execution_log_id,
-                    action_type: actionModal.actionType,
                     remarks,
                 });
-                if (response.data.success) {
-                    toast.success('Status updated!');
-                    setActionModal(null);
-                    fetchTasks();
-                } else {
-                    toast.error(response.data.message);
-                }
+                setShiftInfo(checkData);
+                setActionModal(null);
+                return;
             }
-        } catch (error) {
-            toast.error('Action failed');
+
+            const response = await api.post('/tasks/extend/', {
+                execution_log_id: actionModal.task.execution_log_id,
+                extended_date,
+                remarks,
+            });
+            if (response.data.success) {
+                toast.success('Deadline extended!');
+                setActionModal(null);
+                fetchTasks();
+            }
+        } else {
+            // ---------------- OTHER ACTIONS ----------------
+            const response = await api.post('/tasks/update-status/', {
+                execution_log_id: actionModal.task.execution_log_id,
+                action_type: actionModal.actionType,
+                remarks,
+            });
+            if (response.data.success) {
+                toast.success('Status updated!');
+                setActionModal(null);
+                fetchTasks();
+            } else {
+                toast.error(response.data.message || "Action failed");
+            }
         }
-    };
+    } catch (error) {
+        console.error(error.response?.data || error); // ✅ log exact backend error
+        toast.error('Action failed');
+    }
+};
 
     const handleShift = async (date) => {
         try {
