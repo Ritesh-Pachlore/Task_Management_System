@@ -1,8 +1,9 @@
 USE [DButilities]
 GO
-
-IF EXISTS (SELECT * FROM sys.objects WHERE name = 'sp_generate_recurring_tasks' AND type = 'P')
-    DROP PROCEDURE [dbo].[sp_generate_recurring_tasks];
+/****** Object:  StoredProcedure [dbo].[sp_generate_recurring_tasks]    Script Date: 27-02-2026 12:46:26 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
 GO
 
 -- ═══════════════════════════════════════════════════════════════
@@ -24,7 +25,7 @@ GO
 --   5. Assigns to ALL originally assigned employees.
 -- ═══════════════════════════════════════════════════════════════
 
-CREATE PROCEDURE [dbo].[sp_generate_recurring_tasks]
+ALTER PROCEDURE [dbo].[sp_generate_recurring_tasks]
     @target_date DATE = NULL
 AS
 BEGIN
@@ -176,6 +177,17 @@ BEGIN
                 END
             END
         END
+		
+		-- ════════════════════════════════════════════════════════
+		-- NEW: PREVENT DUPLICATES ON INITIAL START DATE
+		-- ════════════════════════════════════════════════════════
+		-- sp_create_task already created the initial UI instance! 
+		-- If today is the exact start date, do not spawn another one.
+		IF @target_date = @task_start_date
+		BEGIN
+			SET @should_create = 0;
+		END
+
 
         -- ════════════════════════════════════════════════════════
         -- CREATE INSTANCES with per-instance deadlines
@@ -264,4 +276,3 @@ BEGIN
         @tasks_skipped AS tasks_skipped,
         'Recurring task generation complete for ' + CONVERT(VARCHAR, @target_date, 23) AS message;
 END
-GO

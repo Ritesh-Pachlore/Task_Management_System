@@ -1,6 +1,6 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_update_task_status]    Script Date: 26-02-2026 09:40:38 ******/
+/****** Object:  StoredProcedure [dbo].[sp_update_task_status]    Script Date: 27-02-2026 12:47:52 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -69,16 +69,28 @@ BEGIN
 
         -- STARTED
         IF @action_type = 1
-        BEGIN
-            UPDATE task_execution_log
-            SET status = @new_status,
-                started_at = CASE 
-                                WHEN started_at IS NULL THEN @now 
-                                ELSE started_at 
-                             END,
-                updated_at = @now
-            WHERE id = @execution_log_id;
-        END
+BEGIN
+    -- New Logic: Prevent Early Starts
+    DECLARE @task_start_date_check DATETIME;
+    SELECT @task_start_date_check = task_start_date
+    FROM task_details WHERE task_id = @task_id;
+    IF @now < @task_start_date_check
+    BEGIN
+        SELECT 'You cannot start this task before its planned start date.' AS message, 0 AS success,
+               NULL AS task_id, NULL AS emp_id, NULL AS assigned_by,
+               NULL AS action_type, NULL AS new_status;
+        ROLLBACK;
+        RETURN;
+    END
+    UPDATE task_execution_log
+    SET status = @new_status,
+        started_at = CASE 
+                        WHEN started_at IS NULL THEN @now 
+                        ELSE started_at 
+                     END,
+        updated_at = @now
+    WHERE id = @execution_log_id;
+END
 
         -- REJECTED
         ELSE IF @action_type = 4

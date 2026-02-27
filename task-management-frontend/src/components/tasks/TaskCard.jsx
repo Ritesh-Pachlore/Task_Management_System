@@ -31,6 +31,14 @@ const TaskCard = ({ task, viewType, onAction }) => {
     // We consider 3000-12-31 as an "infinite" date that shouldn't be shown as a real deadline
     const isInfinite = task.effective_deadline && task.effective_deadline.startsWith('3000');
 
+    // Calculate Start Date differences
+    const today = new Date();
+    const startDate = new Date(task.task_start_date);
+    today.setHours(0, 0, 0, 0);
+    startDate.setHours(0, 0, 0, 0);
+    const isFutureStart = startDate > today;
+    const diffDaysToStart = Math.ceil(Math.abs(startDate - today) / (1000 * 60 * 60 * 24));
+
     const getDueDateColor = () => {
         if (isOverdue) return 'text-danger';
         if (isInfinite) return 'text-muted';
@@ -45,7 +53,14 @@ const TaskCard = ({ task, viewType, onAction }) => {
         const actions = [];
 
         if (viewType === 'SELF') {
-            if (status === 0) actions.push({ type: 1, label: 'Start', cls: 'btn-primary' });
+            // Hide Start button if in the future
+            // if (status === 0 && !isFutureStart) {
+            //     actions.push({ type: 1, label: 'Start', cls: 'btn-primary' });
+            // }
+            // Hide Start button if in the future
+            if (status === 0 && !isFutureStart) {
+                actions.push({ type: 1, label: 'Start', cls: 'btn-primary' });
+            }
             if (status === 1) actions.push({ type: 2, label: 'Submit', cls: 'btn-success' });
             if (status === 4) actions.push({ type: 5, label: 'Resubmit', cls: 'btn-warning' });
             if (status === 7) actions.push({ type: 1, label: 'Resume', cls: 'btn-primary' });
@@ -104,24 +119,24 @@ const TaskCard = ({ task, viewType, onAction }) => {
                 <p className="task-card-desc">{task.task_description}</p>
             )}
             {/* Attachments Section */}
-{task.attachments && task.attachments.length > 0 && (
-    <div className="task-attachments" style={{ marginTop: 10 }}>
-        <strong style={{ fontSize: 13 }}>Attachments:</strong>
-        {task.attachments.map((file, index) => (
-            <div key={index} style={{ marginTop: 4 }}>
-                <a
-                    href={`http://localhost:8001${file.file_url}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ fontSize: 13, color: '#007bff' }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    📎 {file.file_name}
-                </a>
-            </div>
-        ))}
-    </div>
-)}
+            {task.attachments && task.attachments.length > 0 && (
+                <div className="task-attachments" style={{ marginTop: 10 }}>
+                    <strong style={{ fontSize: 13 }}>Attachments:</strong>
+                    {task.attachments.map((file, index) => (
+                        <div key={index} style={{ marginTop: 4 }}>
+                            <a
+                                href={`http://localhost:8001${file.file_url}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ fontSize: 13, color: '#007bff' }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                📎 {file.file_name}
+                            </a>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             <div className="task-card-meta">
                 <div className="task-meta-item">
@@ -144,9 +159,15 @@ const TaskCard = ({ task, viewType, onAction }) => {
                                     ? `Monthly task on ${task.monthly_day_of_month ? task.monthly_day_of_month + getSuffix(task.monthly_day_of_month) : 'N/A'}${(!isInfinite && task.effective_deadline) ? ' | Due: ' + formatDate(task.effective_deadline) : ''}`
                                     : formatDate(task.effective_deadline)
                         }
-                        {!isInfinite && daysText && (
+                        {/* // Display "Starts in X days" */}
+                        {!isInfinite && daysText && !isFutureStart && (
                             <span className={getDueDateColor()}>
                                 {' '}({daysText})
+                            </span>
+                        )}
+                        {isFutureStart && status === 0 && (
+                            <span className="text-info" style={{ marginLeft: '5px', fontWeight: 'bold' }}>
+                                (Starts in {diffDaysToStart} day{diffDaysToStart > 1 ? 's' : ''})
                             </span>
                         )}
                     </span>

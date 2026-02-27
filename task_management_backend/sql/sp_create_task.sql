@@ -1,13 +1,10 @@
 USE [DButilities]
 GO
-
-/****** Object:  StoredProcedure [dbo].[sp_create_task]    Script Date: 20-02-2026 11:37:05 ******/
+/****** Object:  StoredProcedure [dbo].[sp_create_task]    Script Date: 27-02-2026 12:42:33 ******/
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
-
 
 ALTER PROCEDURE [dbo].[sp_create_task]
     @task_title            NVARCHAR(255),
@@ -20,8 +17,9 @@ ALTER PROCEDURE [dbo].[sp_create_task]
     @task_end_time         NVARCHAR(10) = NULL,
     @created_by            BIGINT,
     @emp_list              NVARCHAR(MAX),
+
     -- Recurrence parameters
-    @recurrence_type       VARCHAR(10)  = NULL, -- 'DAILY', 'WEEKLY', 'MONTHLY'
+    @recurrence_type       VARCHAR(10)  = NULL,
     @recurrence_end_date   DATE         = NULL,
     @weekly_days           VARCHAR(100) = NULL,
     @monthly_day_of_month  INT          = NULL
@@ -36,9 +34,9 @@ BEGIN
     DECLARE @final_start_dt   DATETIME;
     DECLARE @final_end_dt     DATETIME;
 
-    -- ────────────────────────────────────────────────────────────
-    -- COMBINE date + time into DATETIME
-    -- ────────────────────────────────────────────────────────────
+    -- ─────────────────────────────────────────────
+    -- Combine date + time
+    -- ─────────────────────────────────────────────
     IF @task_type = 5  -- TIME_BOUND
     BEGIN
         SET @final_start_dt = CAST(@task_start_date AS DATETIME)
@@ -50,7 +48,6 @@ BEGIN
     ELSE IF @task_type = 1 -- DAILY
     BEGIN
         SET @final_start_dt = CAST(@task_start_date AS DATETIME);
-        -- For Daily tasks, set the instance deadline to 11:59:59 PM of the same day
         SET @final_end_dt   = DATEADD(SECOND, 86399, CAST(@task_start_date AS DATETIME));
     END
     ELSE
@@ -62,6 +59,9 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
+        -- ─────────────────────────────────────────────
+        -- Insert Task Master
+        -- ─────────────────────────────────────────────
         INSERT INTO task_details (
             task_title, task_description, task_type,
             priority_type, task_start_date, task_end_date,
@@ -75,30 +75,35 @@ BEGIN
 
         SET @task_id = SCOPE_IDENTITY();
 
-        -- ── Handle Recurrence Pattern ───────────────────────────────
-        IF @task_type IN (1, 2, 3) AND @recurrence_type IS NOT NULL
+        -- ─────────────────────────────────────────────
+        -- Insert Recurrence Pattern (if applicable)
+        -- ─────────────────────────────────────────────
+        IF @task_type IN (1,2,3) AND @recurrence_type IS NOT NULL
         BEGIN
             INSERT INTO recurrence_pattern (
                 task_id, recurrence_type, start_date, end_date,
-                weekly_days, monthly_day_of_month, created_at, updated_at
+                weekly_days, monthly_day_of_month,
+                created_at, updated_at
             )
             VALUES (
-                @task_id, @recurrence_type, @task_start_date, @recurrence_end_date,
-                @weekly_days, @monthly_day_of_month, @now, @now
+                @task_id, @recurrence_type,
+                @task_start_date, @recurrence_end_date,
+                @weekly_days, @monthly_day_of_month,
+                @now, @now
             );
         END
 
-        -- ── Assign First Instance ───────────────────────────────────
-        -- For non-recurring (4, 5) or if today matches the pattern (simple check)
-        -- The daily job will handle subsequent assignments.
-        
-        DECLARE @should_assign BIT = 0;
-        IF @task_type NOT IN (1, 2, 3) SET @should_assign = 1;
-        -- Assign only if today is >= start date AND it's a working day
-        ELSE IF @task_type IN (1, 2, 3) 
-                AND CAST(GETDATE() AS DATE) >= @task_start_date
-                AND dbo.fn_is_non_working_day(CAST(GETDATE() AS DATE)) = 0
-            SET @should_assign = 1; 
+        -- ─────────────────────────────────────────────
+        -- First Instance Assignment Logic
+        -- ─────────────────────────────────────────────
+       -- DECLARE @should_assign BIT = 0;
+		 DECLARE @should_assign BIT = 1;
+
+     --   IF @task_type NOT IN (1,2,3)
+     --       SET @should_assign = 1;
+     --   ELSE IF CAST(GETDATE() AS DATE) >= @task_start_date
+     --           AND dbo.fn_is_non_working_day(CAST(GETDATE() AS DATE)) = 0
+     --       SET @should_assign = 1;
 
         IF @should_assign = 1
         BEGIN
@@ -125,12 +130,20 @@ BEGIN
                 SET @exec_log_id = SCOPE_IDENTITY();
 
                 INSERT INTO task_execution_history (
-                    execution_log_id, action_type, action_by,
-                    remarks, action_at
+                    execution_log_id,
+                    action_type,
+                    action_by,
+                    remarks,
+                    --extended_date,
+                    action_at
                 )
                 VALUES (
-                    @exec_log_id, 0, @created_by,
-                    'Task assigned', @now
+                    @exec_log_id,
+                    0,
+                    @created_by,
+                    'Task assigned',
+                 --   NULL,
+                    @now
                 );
 
                 FETCH NEXT FROM emp_cursor INTO @emp_id;
@@ -142,18 +155,29 @@ BEGIN
 
         COMMIT TRANSACTION;
 
-        SELECT @task_id AS task_id, 'Task created successfully' AS message, 1 AS success;
+        SELECT 
+            @task_id        AS task_id,
+            'Task created successfully' AS message,
+            1               AS success,
+            @final_start_dt AS saved_start_datetime,
+            @final_end_dt   AS saved_end_datetime;
 
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+
         IF CURSOR_STATUS('global','emp_cursor') >= 0
         BEGIN
             CLOSE emp_cursor;
             DEALLOCATE emp_cursor;
         END
-        SELECT 0 AS task_id, ERROR_MESSAGE() AS message, 0 AS success;
+
+        SELECT 
+            0               AS task_id,
+            ERROR_MESSAGE() AS message,
+            0               AS success,
+            NULL            AS saved_start_datetime,
+            NULL            AS saved_end_datetime;
     END CATCH
 END
-GO
-
+    
