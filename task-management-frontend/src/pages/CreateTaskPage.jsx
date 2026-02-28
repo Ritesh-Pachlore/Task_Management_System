@@ -66,6 +66,7 @@ const CreateTaskPage = () => {
     const [empLoading, setEmpLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [showEmpList, setShowEmpList] = useState(false);
+    const [selectedEmpDetails, setSelectedEmpDetails] = useState({}); // { id: { name, dept } }
 
     // Date shift modal state
     const [shiftInfo, setShiftInfo] = useState(null);
@@ -125,25 +126,50 @@ const CreateTaskPage = () => {
     };
 
     const toggleEmployee = (empId) => {
-        setForm(prev => ({
-            ...prev,
-            selectedEmployees: prev.selectedEmployees.includes(empId)
+        setForm(prev => {
+            const isRemoving = prev.selectedEmployees.includes(empId);
+            const newEmployees = isRemoving
                 ? prev.selectedEmployees.filter(id => id !== empId)
-                : [...prev.selectedEmployees, empId],
-        }));
+                : [...prev.selectedEmployees, empId];
+
+            // Re-trigger date validation if dates are already selected
+            if (prev.task_start_date) handleDateCheckTrigger('task_start_date', prev.task_start_date, newEmployees);
+            if (prev.task_end_date) handleDateCheckTrigger('task_end_date', prev.task_end_date, newEmployees);
+
+            if (!isRemoving) {
+                const emp = employees.find(e => e.emp_id === empId);
+                if (emp) {
+                    setSelectedEmpDetails(prevDetails => ({
+                        ...prevDetails,
+                        [empId]: { name: emp.emp_name, dept: emp.emp_department }
+                    }));
+                }
+            }
+
+            return {
+                ...prev,
+                selectedEmployees: newEmployees,
+            };
+        });
     };
 
-    const handleDateChange = async (field, value) => {
-        setField(field, value);
-        if (!value) return;
+    const handleDateCheckTrigger = async (field, dateValue, employeeList) => {
+        if (!dateValue) return;
         try {
-            const res = await api.get(`/tasks/check-date/?date=${value}`);
+            const empListStr = employeeList.join(',');
+            const res = await api.get(`/tasks/check-date/?date=${dateValue}&emp_list=${empListStr}`);
             const data = res.data?.data;
             if (data?.needs_shift) {
                 setShiftTarget(field);
                 setShiftInfo(data);
             }
         } catch { }
+    };
+
+    const handleDateChange = async (field, value) => {
+        setField(field, value);
+        if (!value) return;
+        handleDateCheckTrigger(field, value, form.selectedEmployees);
     };
 
     const handleShiftApproved = (suggestedDate) => {
@@ -546,8 +572,8 @@ const CreateTaskPage = () => {
                                             <label
                                                 key={emp.emp_id}
                                                 className={`emp-row ${isChecked
-                                                        ? 'emp-row-checked'
-                                                        : ''
+                                                    ? 'emp-row-checked'
+                                                    : ''
                                                     }`}
                                             >
                                                 <input
@@ -571,10 +597,10 @@ const CreateTaskPage = () => {
 
                         <div className="chips-wrap" style={{ marginTop: 10 }}>
                             {form.selectedEmployees.map(id => {
-                                const emp = employees.find(e => e.emp_id === id);
+                                const details = selectedEmpDetails[id];
                                 return (
                                     <span key={id} className="chip">
-                                        {emp?.emp_name || id}
+                                        {details?.name || id}
                                         <button type="button" onClick={() => toggleEmployee(id)}>×</button>
                                     </span>
                                 );

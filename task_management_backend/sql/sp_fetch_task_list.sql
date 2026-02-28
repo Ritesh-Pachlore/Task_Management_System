@@ -82,7 +82,6 @@ BEGIN
             WHEN 4 THEN 'REJECTED'
             WHEN 5 THEN 'RESUBMITTED'
             WHEN 6 THEN 'CANCELLED'
-          --WHEN 7 THEN 'ON_HOLD'
         END AS status_name,
 
         el.started_at,
@@ -113,6 +112,7 @@ BEGIN
     LEFT JOIN recurrence_pattern rp  ON td.task_id = rp.task_id
 
     WHERE td.is_active = 1
+      AND el.status <> 6
       AND (
             (@view_type = 'SELF' AND el.emp_id = @emp_id)
          OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id)

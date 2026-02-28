@@ -102,7 +102,7 @@ BEGIN
      --   IF @task_type NOT IN (1,2,3)
      --       SET @should_assign = 1;
      --   ELSE IF CAST(GETDATE() AS DATE) >= @task_start_date
-     --           AND dbo.fn_is_non_working_day(CAST(GETDATE() AS DATE)) = 0
+     --           AND dbo.fn_is_non_working_day(CAST(GETDATE() AS DATE), @emp_id) = 0
      --       SET @should_assign = 1;
 
         IF @should_assign = 1

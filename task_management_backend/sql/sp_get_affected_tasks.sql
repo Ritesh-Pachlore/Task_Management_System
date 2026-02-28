@@ -30,7 +30,7 @@ BEGIN
         el.status,
         CASE el.status
             WHEN 0 THEN 'ASSIGNED' WHEN 1 THEN 'STARTED' WHEN 2 THEN 'SUBMITTED'
-            WHEN 4 THEN 'REJECTED' WHEN 5 THEN 'RESUBMITTED' WHEN 7 THEN 'ON_HOLD'
+            WHEN 4 THEN 'REJECTED' WHEN 5 THEN 'RESUBMITTED'
         END AS status_name,
 
         -- Current deadline
@@ -38,18 +38,15 @@ BEGIN
 
         -- Why is it affected?
         CASE 
-            WHEN DATEPART(WEEKDAY, COALESCE(el.extended_date, td.task_end_date)) = 1
-            THEN 'Sunday'
-            ELSE (
-                SELECT TOP 1 Holiday_Desc FROM LPDATA..holiday_master  -- ⚠️ CHANGE
-                WHERE holiday_date = CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE)
-                  AND is_active = 1                                        -- ⚠️ CHANGE
-            )
+            WHEN dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE), el.emp_id) = 1
+            THEN 'Weekly Off/Holiday'
+            ELSE NULL
         END AS reason,
 
         -- Suggested shifted date
         dbo.fn_get_next_working_day(
-            CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE)
+            CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE),
+            el.emp_id
         ) AS suggested_date,
 
         -- Days until deadline
@@ -63,7 +60,8 @@ BEGIN
       AND COALESCE(el.extended_date, td.task_end_date) >= GETDATE()
       -- Deadline IS on a holiday/Sunday
       AND dbo.fn_is_non_working_day(
-          CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE)
+          CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE),
+          el.emp_id
       ) = 1
       -- View type filter
       AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)

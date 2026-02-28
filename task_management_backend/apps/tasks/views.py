@@ -263,9 +263,19 @@ class CheckDateView(APIView):
     def get(self, request):
         try:
             d = request.query_params.get('date')
+            emp_id = request.query_params.get('emp_id')
+            emp_list = request.query_params.get('emp_list')
+            
             if not d:
                 return error_response("date parameter required")
-            return success_response(data=get_shift_info(d))
+                
+            # If multiple employees, check the first one or aggregate (simpler: check first for now)
+            # Actually, let's allow checking for a specific emp_id if provided
+            target_emp = emp_id
+            if not target_emp and emp_list:
+                target_emp = emp_list.split(',')[0] # Check the first person as a representative
+                
+            return success_response(data=get_shift_info(d, target_emp))
         except Exception as e:
             return error_response(message=str(e))
 

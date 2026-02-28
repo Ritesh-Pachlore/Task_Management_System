@@ -76,194 +76,144 @@ BEGIN
         -- DAILY (type '1' or 'DAILY')
         -- Logic: Assign every working day. Simply skip holidays.
         -- ════════════════════════════════════════════════════════
-        IF @recurrence_type IN ('1', 'DAILY')
-        BEGIN
-            -- Only assign if today is a working day
-            IF dbo.fn_is_non_working_day(@target_date) = 0
-                SET @should_create = 1;
-        END
+        -- ═══════════════════════════════════════════════════════════════
+        -- REFACTORED: Iterate through each assigned employee to check 
+        -- their specific working day schedule.
+        -- ═══════════════════════════════════════════════════════════════
+        DECLARE @emp_id_cur BIGINT;
+        DECLARE @assigned_by_cur BIGINT;
 
-        -- ════════════════════════════════════════════════════════
-        -- WEEKLY (type '2' or 'WEEKLY')
-        -- Logic: Check if today is the selected day. If the 
-        --   selected day was a holiday, today might be the
-        --   shifted working day for it.
-        --
-        -- Example: Task is "every Monday"
-        --   - Normal Monday (working day): Assign ✓
-        --   - Monday is holiday → shift to Tuesday
-        --     Tuesday: fn_get_next_working_day('Monday date') = Tuesday → Assign ✓
-        --   - Next Monday (working day): Assign normally ✓
-        -- ════════════════════════════════════════════════════════
-        ELSE IF @recurrence_type IN ('2', 'WEEKLY')
+        DECLARE emp_assign_cursor CURSOR FOR
+            SELECT DISTINCT emp_id, assigned_by
+            FROM task_execution_log
+            WHERE task_id = @task_id
+              AND id IN (
+                  SELECT MIN(id) 
+                  FROM task_execution_log 
+                  WHERE task_id = @task_id 
+                  GROUP BY emp_id
+              );
+
+        OPEN emp_assign_cursor;
+        FETCH NEXT FROM emp_assign_cursor INTO @emp_id_cur, @assigned_by_cur;
+
+        WHILE @@FETCH_STATUS = 0
         BEGIN
-            -- Find the most recent occurrence of the selected day
-            -- within the last 7 days (including today)
-            DECLARE @check_day INT = 0;
-            WHILE @check_day < 7
+            SET @should_create = 0;
+
+            -- ════════════════════════════════════════════════════════
+            -- DAILY (type '1' or 'DAILY')
+            -- ════════════════════════════════════════════════════════
+            IF @recurrence_type IN ('1', 'DAILY')
             BEGIN
-                DECLARE @candidate_date DATE = DATEADD(DAY, -@check_day, @target_date);
-                DECLARE @candidate_day_name VARCHAR(20) = DATENAME(WEEKDAY, @candidate_date);
-                
-                IF @weekly_days IS NOT NULL AND CHARINDEX(@candidate_day_name, @weekly_days) > 0
+                IF dbo.fn_is_non_working_day(@target_date, @emp_id_cur) = 0
+                    SET @should_create = 1;
+            END
+
+            -- ════════════════════════════════════════════════════════
+            -- WEEKLY (type '2' or 'WEEKLY')
+            -- ════════════════════════════════════════════════════════
+            ELSE IF @recurrence_type IN ('2', 'WEEKLY')
+            BEGIN
+                DECLARE @check_day INT = 0;
+                WHILE @check_day < 7
                 BEGIN
-                    -- Found the scheduled day. Now check:
-                    -- If the scheduled day IS today AND it's a working day → assign
-                    -- If the scheduled day WAS a holiday, is today the shifted day?
-                    IF @check_day = 0 AND dbo.fn_is_non_working_day(@target_date) = 0
+                    DECLARE @candidate_date DATE = DATEADD(DAY, -@check_day, @target_date);
+                    DECLARE @candidate_day_name VARCHAR(20) = DATENAME(WEEKDAY, @candidate_date);
+                    
+                    IF @weekly_days IS NOT NULL AND CHARINDEX(@candidate_day_name, @weekly_days) > 0
                     BEGIN
-                        SET @should_create = 1;
-                    END
-                    ELSE IF @check_day > 0
-                    BEGIN
-                        -- The scheduled day was @check_day days ago
-                        -- Check if that day was a holiday
-                        IF dbo.fn_is_non_working_day(@candidate_date) = 1
+                        IF @check_day = 0 AND dbo.fn_is_non_working_day(@target_date, @emp_id_cur) = 0
                         BEGIN
-                            -- It was a holiday! Is today the next working day after it?
-                            IF @target_date = dbo.fn_get_next_working_day(@candidate_date)
-                                SET @should_create = 1;
+                            SET @should_create = 1;
                         END
+                        ELSE IF @check_day > 0
+                        BEGIN
+                            IF dbo.fn_is_non_working_day(@candidate_date, @emp_id_cur) = 1
+                            BEGIN
+                                IF @target_date = dbo.fn_get_next_working_day(@candidate_date, @emp_id_cur)
+                                    SET @should_create = 1;
+                            END
+                        END
+                        BREAK;
                     END
-                    BREAK; -- Found the match, stop looking
+                    SET @check_day = @check_day + 1;
                 END
-                SET @check_day = @check_day + 1;
             END
-        END
 
-        -- ════════════════════════════════════════════════════════
-        -- MONTHLY (type '3' or 'MONTHLY')
-        -- Logic: Check if today is the selected date. If the 
-        --   selected date was a holiday, check if today is the
-        --   shifted working day.
-        --
-        -- Example: Task is "every 15th"
-        --   - Mar 15 is working day: Assign ✓
-        --   - Apr 15 is holiday → shift to Apr 16
-        --     Apr 16: fn_get_next_working_day('Apr 15') = Apr 16 → Assign ✓
-        --   - May 15 is working day: Assign normally ✓
-        -- ════════════════════════════════════════════════════════
-        ELSE IF @recurrence_type IN ('3', 'MONTHLY')
-        BEGIN
-            IF DAY(@target_date) = @monthly_day
+            -- ════════════════════════════════════════════════════════
+            -- MONTHLY (type '3' or 'MONTHLY')
+            -- ════════════════════════════════════════════════════════
+            ELSE IF @recurrence_type IN ('3', 'MONTHLY')
             BEGIN
-                -- Today IS the scheduled date
-                IF dbo.fn_is_non_working_day(@target_date) = 0
-                    SET @should_create = 1;
-                -- If today is the scheduled date but it's a holiday,
-                -- do nothing — fn_get_next_working_day will handle it on the shifted day
-            END
-            ELSE
-            BEGIN
-                -- Today is NOT the scheduled date, but maybe it's the shifted version
-                -- Build the scheduled date for this month
                 DECLARE @scheduled_day INT = @monthly_day;
-                -- Handle months with fewer days (e.g., Feb 30 → Feb 28)
                 DECLARE @days_in_month INT = DAY(EOMONTH(@target_date));
-                IF @scheduled_day > @days_in_month
-                    SET @scheduled_day = @days_in_month;
+                IF @scheduled_day > @days_in_month SET @scheduled_day = @days_in_month;
                 
-                DECLARE @scheduled_date DATE = DATEFROMPARTS(
-                    YEAR(@target_date), MONTH(@target_date), @scheduled_day
-                );
+                DECLARE @scheduled_date DATE = DATEFROMPARTS(YEAR(@target_date), MONTH(@target_date), @scheduled_day);
                 
-                -- Check if the scheduled date was a holiday AND today is the shifted day
-                IF @scheduled_date < @target_date  -- scheduled date has passed
-                   AND dbo.fn_is_non_working_day(@scheduled_date) = 1
-                   AND @target_date = dbo.fn_get_next_working_day(@scheduled_date)
-                   AND dbo.fn_is_non_working_day(@target_date) = 0
+                IF @target_date = @scheduled_date
+                BEGIN
+                    IF dbo.fn_is_non_working_day(@target_date, @emp_id_cur) = 0
+                        SET @should_create = 1;
+                END
+                ELSE IF @scheduled_date < @target_date
+                   AND dbo.fn_is_non_working_day(@scheduled_date, @emp_id_cur) = 1
+                   AND @target_date = dbo.fn_get_next_working_day(@scheduled_date, @emp_id_cur)
                 BEGIN
                     SET @should_create = 1;
                 END
             END
-        END
-		
-		-- ════════════════════════════════════════════════════════
-		-- NEW: PREVENT DUPLICATES ON INITIAL START DATE
-		-- ════════════════════════════════════════════════════════
-		-- sp_create_task already created the initial UI instance! 
-		-- If today is the exact start date, do not spawn another one.
-		IF @target_date = @task_start_date
-		BEGIN
-			SET @should_create = 0;
-		END
 
+            -- Prevent duplicates on start date
+            IF @target_date = @task_start_date SET @should_create = 0;
 
-        -- ════════════════════════════════════════════════════════
-        -- CREATE INSTANCES with per-instance deadlines
-        -- ════════════════════════════════════════════════════════
-        IF @should_create = 1
-        BEGIN
-            -- Check if we already created entries for this task today
-            IF NOT EXISTS (
-                SELECT 1 FROM task_execution_log 
-                WHERE task_id = @task_id 
-                  AND CAST(created_at AS DATE) = @target_date
-            )
+            -- ════════════════════════════════════════════════════════
+            -- CREATE INSTANCE
+            -- ════════════════════════════════════════════════════════
+            IF @should_create = 1
             BEGIN
-                -- Calculate deadline: today at 23:59:59
-                DECLARE @instance_deadline DATETIME = CAST(
-                    CAST(@target_date AS VARCHAR) + ' 23:59:59' AS DATETIME
-                );
-
-                -- Update the task_details end_date to this instance's deadline
-                -- so that overdue calculation works correctly
-                UPDATE task_details 
-                SET task_end_date = @instance_deadline
-                WHERE task_id = @task_id;
-
-                -- Insert new execution log for ALL assigned employees
-                INSERT INTO task_execution_log (
-                    task_id, emp_id, assigned_by, status,
-                    started_at, extended_date, rejection_count,
-                    created_at, updated_at
+                IF NOT EXISTS (
+                    SELECT 1 FROM task_execution_log 
+                    WHERE task_id = @task_id 
+                      AND emp_id = @emp_id_cur
+                      AND CAST(created_at AS DATE) = @target_date
                 )
-                SELECT DISTINCT
-                    @task_id, 
-                    orig.emp_id, 
-                    orig.assigned_by, 
-                    0,          -- ASSIGNED status
-                    NULL, NULL, 0,
-                    @now, @now
-                FROM task_execution_log orig
-                WHERE orig.task_id = @task_id
-                  AND orig.id IN (
-                      SELECT MIN(id) 
-                      FROM task_execution_log 
-                      WHERE task_id = @task_id 
-                      GROUP BY emp_id
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1 FROM task_execution_log dup
-                      WHERE dup.task_id = @task_id 
-                        AND dup.emp_id = orig.emp_id
-                        AND CAST(dup.created_at AS DATE) = @target_date
-                  );
+                BEGIN
+                    -- Deadline: today at 23:59:59 (Fixed lifecycle)
+                    DECLARE @instance_deadline DATETIME = CAST(CAST(@target_date AS VARCHAR) + ' 23:59:59' AS DATETIME);
 
-                -- Create audit history entries
-                INSERT INTO task_execution_history (
-                    execution_log_id, action_type, action_by,
-                    remarks, action_at
-                )
-                SELECT 
-                    el.id, 0, el.assigned_by,
-                    'Auto-assigned by recurring task scheduler',
-                    @now
-                FROM task_execution_log el
-                WHERE el.task_id = @task_id
-                  AND CAST(el.created_at AS DATE) = @target_date
-                  AND NOT EXISTS (
-                      SELECT 1 FROM task_execution_history h
-                      WHERE h.execution_log_id = el.id
-                  );
+                    -- Update core task record end_date for audit/visibility
+                    UPDATE task_details SET task_end_date = @instance_deadline WHERE task_id = @task_id;
 
-                SET @tasks_created = @tasks_created + 1;
+                    INSERT INTO task_execution_log (
+                        task_id, emp_id, assigned_by, status,
+                        started_at, extended_date, rejection_count,
+                        created_at, updated_at
+                    )
+                    VALUES (
+                        @task_id, @emp_id_cur, @assigned_by_cur, 0,
+                        NULL, NULL, 0, @now, @now
+                    );
+
+                    DECLARE @new_exec_id BIGINT = SCOPE_IDENTITY();
+
+                    INSERT INTO task_execution_history (execution_log_id, action_type, action_by, remarks, action_at)
+                    VALUES (@new_exec_id, 0, @assigned_by_cur, 'Auto-assigned by recurring task scheduler', @now);
+
+                    SET @tasks_created = @tasks_created + 1;
+                END
+                ELSE
+                BEGIN
+                    SET @tasks_skipped = @tasks_skipped + 1;
+                END
             END
-            ELSE
-            BEGIN
-                SET @tasks_skipped = @tasks_skipped + 1;
-            END
+
+            FETCH NEXT FROM emp_assign_cursor INTO @emp_id_cur, @assigned_by_cur;
         END
+
+        CLOSE emp_assign_cursor;
+        DEALLOCATE emp_assign_cursor;
 
         FETCH NEXT FROM pattern_cursor INTO @task_id, @recurrence_type, @weekly_days, @monthly_day, @created_by, @task_start_date;
     END
