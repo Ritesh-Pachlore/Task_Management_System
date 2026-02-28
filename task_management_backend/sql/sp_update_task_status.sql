@@ -28,7 +28,7 @@ BEGIN
 
         -- Fetch execution row
         SELECT 
-            @current_status = status,
+            @current_status = task_status,
             @task_id = task_id,
             @emp_id = emp_id,
             @assigned_by = assigned_by
@@ -53,8 +53,7 @@ BEGIN
                 WHEN 4 THEN 4   -- REJECTED
                 WHEN 5 THEN 5   -- RESUBMITTED
                 WHEN 6 THEN 6   -- CANCELLED
-                WHEN 7 THEN 7   -- ON_HOLD
-                WHEN 8 THEN @current_status -- EXTENDED (no status change)
+                WHEN 7 THEN @current_status -- EXTENDED (no status change)
                 ELSE -1
             END;
 
@@ -83,7 +82,7 @@ BEGIN
         RETURN;
     END
     UPDATE task_execution_log
-    SET status = @new_status,
+    SET task_status = @new_status,
         started_at = CASE 
                         WHEN started_at IS NULL THEN @now 
                         ELSE started_at 
@@ -96,14 +95,14 @@ END
         ELSE IF @action_type = 4
         BEGIN
             UPDATE task_execution_log
-            SET status = @new_status,
+            SET task_status = @new_status,
                 rejection_count = rejection_count + 1,
                 updated_at = @now
             WHERE id = @execution_log_id;
         END
 
         -- EXTENDED
-        ELSE IF @action_type = 8
+        ELSE IF @action_type = 7
         BEGIN
             IF @extended_date IS NULL
             BEGIN
@@ -125,9 +124,17 @@ END
         ELSE
         BEGIN
             UPDATE task_execution_log
-            SET status = @new_status,
+            SET task_status = @new_status,
                 updated_at = @now
             WHERE id = @execution_log_id;
+        END
+
+        -- NEW: Deactivate master task if cancelled (Moved outside ELSE block for reliability)
+        IF @action_type = 6
+        BEGIN
+            UPDATE task_details 
+            SET is_active = 0 
+            WHERE task_id = @task_id;
         END
 
         -- Insert history with smart default remarks
@@ -144,7 +151,7 @@ END
             @action_by,
             CASE
                 -- EXTENDED
-                WHEN @action_type = 8 THEN
+                WHEN @action_type = 7 THEN
                     CONCAT(
                         'Deadline extended to ',
                         CONVERT(VARCHAR(19), @extended_date, 120),

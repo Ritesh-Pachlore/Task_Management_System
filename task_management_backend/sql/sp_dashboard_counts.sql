@@ -13,38 +13,27 @@ BEGIN
     ------------------------------------------------------------
     SELECT
         COUNT(*) AS total_tasks,
-
         SUM(CASE WHEN el.task_status = 0 THEN 1 ELSE 0 END) AS assigned_count,
         SUM(CASE WHEN el.task_status IN (1, 5) THEN 1 ELSE 0 END) AS in_progress_count,
         SUM(CASE WHEN el.task_status = 2 THEN 1 ELSE 0 END) AS submitted_count,
         SUM(CASE WHEN el.task_status = 3 THEN 1 ELSE 0 END) AS approved_count,
         SUM(CASE WHEN el.task_status = 4 THEN 1 ELSE 0 END) AS rejected_count,
         SUM(CASE WHEN el.task_status = 6 THEN 1 ELSE 0 END) AS cancelled_count,
-
-        SUM(CASE WHEN el.task_status IN (0,1,2,5,7) THEN 1 ELSE 0 END) AS pending_count,
+        SUM(CASE WHEN el.task_status = 0 THEN 1 ELSE 0 END) AS pending_count,
         SUM(CASE WHEN el.extended_date IS NOT NULL THEN 1 ELSE 0 END) AS extended_count,
-
-        SUM(CASE 
-                WHEN COALESCE(el.extended_date, td.task_end_date) < GETDATE()
-                     AND el.task_status NOT IN (3,6)
-                THEN 1 ELSE 0
-            END) AS overdue_count,
-
-        SUM(CASE 
-                WHEN el.task_status NOT IN (3,6)
-                     AND COALESCE(el.extended_date, td.task_end_date) >= GETDATE()
-                     AND dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE)) = 1
-                THEN 1 ELSE 0
-            END) AS holiday_affected_count
-
+        SUM(CASE WHEN COALESCE(el.extended_date, td.task_end_date) < GETDATE()
+                 AND el.task_status NOT IN (3, 6) THEN 1 ELSE 0 END) AS overdue_count,
+        SUM(CASE WHEN el.task_status NOT IN (3, 6)
+                 AND COALESCE(el.extended_date, td.task_end_date) >= GETDATE()
+                 AND dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE), el.emp_id) = 1
+                 THEN 1 ELSE 0 END) AS holiday_affected_count
     FROM task_execution_log el
     INNER JOIN task_details td ON el.task_id = td.task_id
     WHERE td.is_active = 1
-      AND (
-            (@view_type = 'SELF' AND el.emp_id = @emp_id)
-            OR
-            (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id)
-          )
+      AND el.task_status <> 6
+      AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)
+           OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id))
+      -- ↓ NEW: date filter on task_end_date
       AND (@date_from IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to   IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id);
@@ -63,7 +52,7 @@ BEGIN
 
             COUNT(*) AS total_tasks,
             SUM(CASE WHEN el.task_status = 3 THEN 1 ELSE 0 END) AS completed,
-            SUM(CASE WHEN el.task_status IN (0,1,2,5) THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN el.task_status = 0 THEN 1 ELSE 0 END) AS pending,
 
             SUM(CASE 
                     WHEN COALESCE(el.extended_date, td.task_end_date) < GETDATE()
@@ -76,60 +65,42 @@ BEGIN
 
         FROM task_execution_log el
         INNER JOIN task_details td ON el.task_id = td.task_id
-        WHERE el.assigned_by = @emp_id
-          AND td.is_active = 1
-          AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
-          AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
-          AND (@employee_id IS NULL OR el.emp_id = @employee_id)
-
-        GROUP BY el.emp_id
-        ORDER BY overdue DESC;
+        WHERE el.assigned_by = @emp_id AND td.is_active = 1 AND el.task_status <> 6
+          AND (@date_from    IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
+          AND (@date_to      IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
+          AND (@employee_id  IS NULL OR el.emp_id = @employee_id)   -- ← NEW
+        GROUP BY el.emp_id ORDER BY overdue DESC;
     END
     ELSE
     BEGIN
         SELECT NULL AS emp_id, NULL AS emp_name, NULL AS total_tasks,
                NULL AS completed, NULL AS pending, NULL AS overdue,
-               NULL AS rejected, NULL AS extended
-        WHERE 1 = 0;
+               NULL AS rejected, NULL AS extended WHERE 1 = 0;
     END
-
 
     ------------------------------------------------------------
     -- RESULT SET 3: Status chart
     ------------------------------------------------------------
     SELECT
+        el.task_status AS status,
         CASE el.task_status
-            WHEN 0 THEN 'Pending'
-            WHEN 1 THEN 'Started'
-            WHEN 2 THEN 'Submitted'
-            WHEN 3 THEN 'Approved'
-            WHEN 4 THEN 'Rejected'
-            WHEN 5 THEN 'Resubmitted'
-            WHEN 6 THEN 'Cancelled'
-            WHEN 7 THEN 'On Hold'
-        END AS name,
-
+            WHEN 0 THEN 'ASSIGNED'
+            WHEN 1 THEN 'STARTED'
+            WHEN 2 THEN 'SUBMITTED'
+            WHEN 3 THEN 'APPROVED'
+            WHEN 4 THEN 'REJECTED'
+            WHEN 5 THEN 'RESUBMITTED'
+            WHEN 6 THEN 'CANCELLED'
+        END AS status_name,
         COUNT(*) AS value,
-
-        CASE el.task_status
-            WHEN 0 THEN '#8884d8'
-            WHEN 1 THEN '#82ca9d'
-            WHEN 2 THEN '#ffc658'
-            WHEN 3 THEN '#00C49F'
-            WHEN 4 THEN '#FF6B6B'
-            WHEN 5 THEN '#FFBB28'
-            WHEN 6 THEN '#999999'
-            WHEN 7 THEN '#FF8042'
-        END AS color
-
+        CASE el.task_status WHEN 0 THEN '#8884d8' WHEN 1 THEN '#82ca9d' WHEN 2 THEN '#ffc658'
+            WHEN 3 THEN '#00C49F' WHEN 4 THEN '#FF6B6B' WHEN 5 THEN '#FFBB28'
+            WHEN 6 THEN '#999999' END AS color
     FROM task_execution_log el
     INNER JOIN task_details td ON el.task_id = td.task_id
-    WHERE td.is_active = 1
-      AND (
-            (@view_type = 'SELF' AND el.emp_id = @emp_id)
-            OR
-            (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id)
-          )
+    WHERE td.is_active = 1 AND el.task_status <> 6
+      AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)
+           OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id))
       AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)
@@ -153,12 +124,9 @@ BEGIN
 
     FROM task_execution_log el
     INNER JOIN task_details td ON el.task_id = td.task_id
-    WHERE td.is_active = 1
-      AND (
-            (@view_type = 'SELF' AND el.emp_id = @emp_id)
-            OR
-            (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id)
-          )
+    WHERE td.is_active = 1 AND el.task_status <> 6
+      AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)
+           OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id))
       AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)
@@ -185,12 +153,9 @@ BEGIN
 
     FROM task_execution_log el
     INNER JOIN task_details td ON el.task_id = td.task_id
-    WHERE td.is_active = 1
-      AND (
-            (@view_type = 'SELF' AND el.emp_id = @emp_id)
-            OR
-            (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id)
-          )
+    WHERE td.is_active = 1 AND el.task_status <> 6
+      AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)
+           OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id))
       AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)

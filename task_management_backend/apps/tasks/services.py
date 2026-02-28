@@ -349,9 +349,10 @@ def get_employees(emp_id, search=None):
             AND (
                 CAST(s.EMP_ID AS NVARCHAR(20)) LIKE %s
                 OR s.STF_FRNAME + ' ' + s.STF_LSNAME LIKE %s
+                OR d.DEP_NAME LIKE %s
             )
         """
-        params = [f'%{search}%', f'%{search}%']
+        params = [f'%{search}%', f'%{search}%', f'%{search}%']
 
     query += " ORDER BY s.STF_FRNAME, s.STF_LSNAME"
 

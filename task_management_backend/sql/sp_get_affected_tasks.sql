@@ -31,21 +31,11 @@ BEGIN
          WHERE EMP_ID = el.emp_id) AS emp_name,
 
         el.assigned_by,
-
-        (SELECT STF_FRNAME + ' ' + STF_LSNAME 
-         FROM inout_aems..staffmst 
-         WHERE EMP_ID = el.assigned_by) AS assigned_by_name,
-
-        -- ✅ FIXED COLUMN
+        (SELECT STF_FRNAME + ' ' + STF_LSNAME FROM inout_aems..staffmst WHERE EMP_ID = el.assigned_by) AS assigned_by_name,
         el.task_status,
-
         CASE el.task_status
-            WHEN 0 THEN 'ASSIGNED'
-            WHEN 1 THEN 'STARTED'
-            WHEN 2 THEN 'SUBMITTED'
-            WHEN 4 THEN 'REJECTED'
-            WHEN 5 THEN 'RESUBMITTED'
-            WHEN 7 THEN 'ON_HOLD'
+            WHEN 0 THEN 'ASSIGNED' WHEN 1 THEN 'STARTED' WHEN 2 THEN 'SUBMITTED'
+            WHEN 4 THEN 'REJECTED' WHEN 5 THEN 'RESUBMITTED'
         END AS status_name,
 
         -- Current deadline
@@ -53,18 +43,15 @@ BEGIN
 
         -- Why is it affected?
         CASE 
-            WHEN DATEPART(WEEKDAY, COALESCE(el.extended_date, td.task_end_date)) = 1
-                THEN 'Sunday'
-            ELSE (
-                SELECT TOP 1 Holiday_Desc 
-                FROM LPDATA..holiday_master
-                WHERE holiday_date = CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE)
-            )
+            WHEN dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE), el.emp_id) = 1
+            THEN 'Weekly Off/Holiday'
+            ELSE NULL
         END AS reason,
 
         -- Suggested shifted date
         dbo.fn_get_next_working_day(
-            CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE)
+            CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE),
+            el.emp_id
         ) AS suggested_date,
 
         -- Days until deadline
@@ -73,23 +60,19 @@ BEGIN
         ) AS days_until_deadline
 
     FROM task_details td
-    INNER JOIN task_execution_log el 
-        ON td.task_id = el.task_id
-
+    INNER JOIN task_execution_log el ON td.task_id = el.task_id
     WHERE td.is_active = 1
-      AND el.task_status NOT IN (3, 6)   -- ✅ FIXED
+      AND el.task_status NOT IN (3, 6)  -- Not completed/cancelled
+      -- Only FUTURE deadlines (not past)
       AND COALESCE(el.extended_date, td.task_end_date) >= GETDATE()
-
+      -- Deadline IS on a holiday/Sunday
       AND dbo.fn_is_non_working_day(
-            CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE)
-          ) = 1
-
-      AND (
-            (@view_type = 'SELF' AND el.emp_id = @emp_id)
-         OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id)
-          )
-
+          CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE),
+          el.emp_id
+      ) = 1
+      -- View type filter
+      AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)
+           OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id))
     ORDER BY COALESCE(el.extended_date, td.task_end_date) ASC;
-
 END
 GO

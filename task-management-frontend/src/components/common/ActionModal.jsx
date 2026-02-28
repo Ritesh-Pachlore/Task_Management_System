@@ -306,6 +306,21 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
                     </div>
                 )}
 
+                {actionModal?.actionType === 6 && (
+                    <div style={{
+                        color: '#d32f2f',
+                        background: '#ffebee',
+                        padding: '10px',
+                        borderRadius: '6px',
+                        marginBottom: '15px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        border: '1px solid #ffcdd2'
+                    }}>
+                        ⚠️ This task is going to deactivate and user will no longer able to see this task on UI
+                    </div>
+                )}
+
                 <div className="form-group">
                     <label>Remarks</label>
                     <textarea

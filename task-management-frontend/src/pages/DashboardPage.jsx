@@ -412,10 +412,10 @@ const DashboardPage = () => {
                                     <thead>
                                         <tr>
                                             <th>Employee</th>
-                                            <th>Department</th>
                                             <th>Task Title</th>
                                             <th>Description</th>
                                             <th>Priority</th>
+                                            <th>Start Date</th>
                                             <th>End Date</th>
                                             <th>Due by</th>
                                         </tr>
@@ -446,7 +446,7 @@ const DashboardPage = () => {
                                                                 }
                                                             }}
                                                         >
-                                                            {/* {task.emp_name || 'Unassigned'}
+                                                            {task.emp_name || 'Unassigned'}
                                                         </td>
                                                         <td>{task.task_title}</td>
                                                         <td style={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -461,27 +461,7 @@ const DashboardPage = () => {
                                                                 {task.priority_type === 3 ? 'HIGH' : task.priority_type === 2 ? 'MEDIUM' : 'LOW'}
                                                             </span>
                                                         </td>
-                                                        <td>{formatDate(task.effective_deadline)}</td>
-                                                        <td style={{ color: isOverdue ? '#f44336' : '#999', fontWeight: isOverdue ? 600 : 400 }}>
-                                                            {getDaysText(task.days_remaining) || '-'}
-                                                        </td>
-                                                    </tr> */}
-                                                    {task.emp_name || 'Unassigned'}
-                                                        </td>
-                                                            <td>{getDeptName(task) || 'N/A'}</td>
-                                                        <td>{task.task_title}</td>
-                                                        <td style={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                            {task.task_description}
-                                                        </td>
-                                                        <td>
-                                                            <span style={{
-                                                                padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-                                                                background: task.priority_type === 3 ? '#ffebee' : task.priority_type === 2 ? '#fff3e0' : '#e8f5e9',
-                                                                color: task.priority_type === 3 ? '#f44336' : task.priority_type === 2 ? '#ff9800' : '#4caf50'
-                                                            }}>
-                                                                {task.priority_type === 3 ? 'HIGH' : task.priority_type === 2 ? 'MEDIUM' : 'LOW'}
-                                                            </span>
-                                                        </td>
+                                                        <td>{formatDate(task.task_start_date) || 'N/A'}</td>
                                                         <td>{formatDate(task.effective_deadline)}</td>
                                                         <td style={{ color: isOverdue ? '#f44336' : '#999', fontWeight: isOverdue ? 600 : 400 }}>
                                                             {getDaysText(task.days_remaining) || '-'}
@@ -595,7 +575,7 @@ const DashboardPage = () => {
                                             >
                                                 {emp.emp_name}
                                             </td>
-                                            <td>{getDeptName(emp) || 'N/A'}</td>   
+                                            <td>{getDeptName(emp) || 'N/A'}</td>
                                             <td>{emp.total_tasks}</td>
                                             <td style={{ color: '#4CAF50' }}>
                                                 {emp.completed}

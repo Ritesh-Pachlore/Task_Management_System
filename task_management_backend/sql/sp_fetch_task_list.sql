@@ -73,8 +73,8 @@ BEGIN
          FROM inout_aems..staffmst
          WHERE EMP_ID = el.assigned_by) AS assigned_by_name,
 
-        -- UPDATED: changed el.status → el.task_status
-        el.task_status AS status,
+        -- UPDATED: standardized to el.task_status
+        el.task_status,
         CASE el.task_status
             WHEN 0 THEN 'ASSIGNED'
             WHEN 1 THEN 'STARTED'
@@ -83,7 +83,6 @@ BEGIN
             WHEN 4 THEN 'REJECTED'
             WHEN 5 THEN 'RESUBMITTED'
             WHEN 6 THEN 'CANCELLED'
-            WHEN 7 THEN 'ON_HOLD'
         END AS status_name,
 
         el.started_at,
@@ -130,7 +129,8 @@ BEGIN
     INNER JOIN task_execution_log el ON td.task_id = el.task_id
     LEFT JOIN recurrence_pattern rp  ON td.task_id = rp.task_id
 
-    WHERE td.is_active = 1 AND el.is_active = 1
+    WHERE td.is_active = 1
+      AND el.status <> 6
       AND (
             (@view_type = 'SELF' AND el.emp_id = @emp_id)
          OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id)
