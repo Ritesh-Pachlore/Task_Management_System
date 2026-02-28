@@ -1,10 +1,10 @@
 // src/pages/CreateTaskPage.jsx
 
-import React, { useState, useEffect,useRef} from 'react';
-import { useNavigate }    from 'react-router-dom';
-import api                from '../api/axios';
-import { toast }          from 'react-toastify';
-import DateShiftModal     from '../components/common/DateShiftModal';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/axios';
+import { toast } from 'react-toastify';
+import DateShiftModal from '../components/common/DateShiftModal';
 import './CreateTaskPage.css';
 
 // ─────────────────────────────────────────────────────────────────
@@ -24,18 +24,18 @@ import './CreateTaskPage.css';
 
 const TASK_TYPES = [
     {
-        value:       4,
-        label:       'Random',
+        value: 4,
+        label: 'Random',
         // icon:        '🎲',
         // description: 'No fixed end date',
-        active:      true,
+        active: true,
     },
     {
-        value:       5,
-        label:       'Time Bound',
+        value: 5,
+        label: 'Time Bound',
         // icon:        '⏱️',
         // description: 'Fixed start & end with time',
-        active:      true,
+        active: true,
     },
     // ── FUTURE TYPES — uncomment block + backend when ready ──────
     // {
@@ -62,9 +62,9 @@ const TASK_TYPES = [
 ];
 
 const PRIORITIES = [
-    { value: 1, label: 'Low',    color: '#4CAF50', bg: '#E8F5E9' },
+    { value: 1, label: 'Low', color: '#4CAF50', bg: '#E8F5E9' },
     { value: 2, label: 'Medium', color: '#FF9800', bg: '#FFF3E0' },
-    { value: 3, label: 'High',   color: '#F44336', bg: '#FFEBEE' },
+    { value: 3, label: 'High', color: '#F44336', bg: '#FFEBEE' },
 ];
 
 // Days for future WEEKLY type
@@ -81,15 +81,15 @@ const PRIORITIES = [
 const today = new Date().toISOString().split('T')[0];
 
 const INITIAL_FORM = {
-    task_title:        '',
-    task_description:  '',
+    task_title: '',
+    task_description: '',
     attachments: [],
-    task_type:         4,          // default → Random
-    priority_type:     2,          // default → Medium
-    task_start_date:   today,
-    task_end_date:     '',
-    start_time:        '',          // only for TIME_BOUND
-    end_time:          '',          // only for TIME_BOUND
+    task_type: 4,          // default → Random
+    priority_type: 2,          // default → Medium
+    task_start_date: today,
+    task_end_date: '',
+    start_time: '',          // only for TIME_BOUND
+    end_time: '',          // only for TIME_BOUND
     // day_of_week:    '',          // FUTURE: Weekly
     selectedEmployees: [],
 };
@@ -100,15 +100,15 @@ const CreateTaskPage = () => {
     const navigate = useNavigate();
     const dropdownRef = useRef(null);
 
-    const [form,        setForm]        = useState(INITIAL_FORM);
-    const [employees,   setEmployees]   = useState([]);
-    const [empSearch,   setEmpSearch]   = useState('');
-    const [empLoading,  setEmpLoading]  = useState(false);
-    const [submitting,  setSubmitting]  = useState(false);
-     const [showEmpList, setShowEmpList] = useState(false);
+    const [form, setForm] = useState(INITIAL_FORM);
+    const [employees, setEmployees] = useState([]);
+    const [empSearch, setEmpSearch] = useState('');
+    const [empLoading, setEmpLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [showEmpList, setShowEmpList] = useState(false);
 
     // Date shift modal state
-    const [shiftInfo,   setShiftInfo]   = useState(null);
+    const [shiftInfo, setShiftInfo] = useState(null);
     const [shiftTarget, setShiftTarget] = useState('');   // 'task_start_date' | 'task_end_date'
 
 
@@ -171,10 +171,10 @@ const CreateTaskPage = () => {
     const handleTaskTypeChange = (typeValue) => {
         setForm(prev => ({
             ...prev,
-            task_type:      typeValue,
-            task_end_date:  '',
-            start_time:     '',
-            end_time:       '',
+            task_type: typeValue,
+            task_end_date: '',
+            start_time: '',
+            end_time: '',
             // day_of_week: '',   // FUTURE: reset weekly
         }));
     };
@@ -198,7 +198,7 @@ const CreateTaskPage = () => {
         if (!value) return;
 
         try {
-            const res  = await api.get(`/tasks/check-date/?date=${value}`);
+            const res = await api.get(`/tasks/check-date/?date=${value}`);
             const data = res.data?.data;
             if (data?.needs_shift) {
                 setShiftTarget(field);
@@ -224,16 +224,22 @@ const CreateTaskPage = () => {
         toast.info('Keeping original date');
     };
 
-     /* ───────────────── FILE HANDLER ───────────────── */
+    /* ───────────────── FILE HANDLER ───────────────── */
 
     const handleFileChange = (e) => {
         const files = Array.from(e.target.files);
-
         const validFiles = [];
 
         for (let file of files) {
-            if (file.size > 5 * 1024 * 1024) {
-                toast.error(`${file.name} exceeds 5MB limit`);
+            // Check if the file is an image based on its MIME type or extension
+            const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(file.name);
+
+            // Set limits: 50 KB for images, 2 MB for other documents
+            const maxSize = isImage ? 50 * 1024 : 2 * 1024 * 1024;
+
+            if (file.size > maxSize) {
+                const limitStr = isImage ? '50 KB' : '2 MB';
+                toast.error(`Upload failed: "${file.name}" exceeds the maximum allowed size of ${limitStr}.`);
                 continue;
             }
             validFiles.push(file);
@@ -241,8 +247,11 @@ const CreateTaskPage = () => {
 
         setForm(prev => ({
             ...prev,
-            attachments: validFiles,
+            attachments: [...prev.attachments, ...validFiles],
         }));
+
+        // Clear the input so the same files can be selected again if needed
+        e.target.value = null;
     };
 
     const removeFile = (index) => {
@@ -330,56 +339,56 @@ const CreateTaskPage = () => {
         // Frontend sends date and time SEPARATELY.
         // SP combines them: "2025-07-15" + "09:00" → 2025-07-15 09:00:00
         // ─────────────────────────────────────────────────────────
-         // ✅ Use FormData instead of payload object
-    const formData = new FormData();
+        // ✅ Use FormData instead of payload object
+        const formData = new FormData();
 
-    formData.append('task_title', form.task_title.trim());
-    formData.append('task_description', form.task_description.trim());
-    formData.append('task_type', form.task_type);
-    formData.append('priority_type', form.priority_type);
-    formData.append('task_start_date', form.task_start_date);
-    formData.append(
-        'task_end_date',
-        form.task_end_date || form.task_start_date
-    );
-    formData.append(
-        'emp_list',
-        form.selectedEmployees.join(',')
-    );
+        formData.append('task_title', form.task_title.trim());
+        formData.append('task_description', form.task_description.trim());
+        formData.append('task_type', form.task_type);
+        formData.append('priority_type', form.priority_type);
+        formData.append('task_start_date', form.task_start_date);
+        formData.append(
+            'task_end_date',
+            form.task_end_date || form.task_start_date
+        );
+        formData.append(
+            'emp_list',
+            form.selectedEmployees.join(',')
+        );
 
-    // Include times only for TIME_BOUND
-    if (form.task_type === 5) {
-        formData.append('start_time', form.start_time);
-        formData.append('end_time', form.end_time);
-    }
+        // Include times only for TIME_BOUND
+        if (form.task_type === 5) {
+            formData.append('start_time', form.start_time);
+            formData.append('end_time', form.end_time);
+        }
 
-    // ✅ Append uploaded files
-    form.attachments.forEach(file => {
-        formData.append('attachments', file);
-    });
-
-    setSubmitting(true);
-        try {
-        const res = await api.post('/tasks/create/', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
+        // ✅ Append uploaded files
+        form.attachments.forEach(file => {
+            formData.append('attachments', file);
         });
 
-        if (res.data.success) {
-            toast.success('Task created successfully!');
-            navigate('/assigned-by-me');
-        } else {
-            toast.error(res.data.message || 'Failed to create task');
-        }
-    } catch (err) {
-        const msg =
-            err.response?.data?.message || 'Failed to create task';
-        toast.error(msg);
-    }
+        setSubmitting(true);
+        try {
+            const res = await api.post('/tasks/create/', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
 
-    setSubmitting(false);
-};
+            if (res.data.success) {
+                toast.success('Task created successfully!');
+                navigate('/assigned-by-me');
+            } else {
+                toast.error(res.data.message || 'Failed to create task');
+            }
+        } catch (err) {
+            const msg =
+                err.response?.data?.message || 'Failed to create task';
+            toast.error(msg);
+        }
+
+        setSubmitting(false);
+    };
 
     // ─────────────────────────────────────────────────────────────
     // RENDER
@@ -424,16 +433,20 @@ const CreateTaskPage = () => {
                         />
                     </div>
 
-                     {/* Attachments */}
+                    {/* Attachments */}
                     <div className="form-group">
                         <label className="form-label">
                             Attach Documents
                         </label>
+                        <small style={{ color: "#6c757d" }}>
+
+                            Maximum size: Images up to 50 KB. Documents up to 2 MB.
+                        </small>
 
                         <input
                             type="file"
                             multiple
-                             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
                             className="form-control"
                             onChange={handleFileChange}
                         />
@@ -471,11 +484,10 @@ const CreateTaskPage = () => {
                                 <button
                                     key={type.value}
                                     type="button"
-                                    className={`toggle-btn ${
-                                        form.task_type === type.value
-                                            ? 'toggle-btn-active'
-                                            : ''
-                                    }`}
+                                    className={`toggle-btn ${form.task_type === type.value
+                                        ? 'toggle-btn-active'
+                                        : ''
+                                        }`}
                                     onClick={() => handleTaskTypeChange(type.value)}
                                     title={type.description}
                                 >
@@ -485,7 +497,7 @@ const CreateTaskPage = () => {
                                 </button>
                             ))}
 
-                            
+
 
                             {/* ── FUTURE placeholder buttons ────────────────────
                                 Uncomment when Daily/Weekly/Monthly are ready.
@@ -507,9 +519,9 @@ const CreateTaskPage = () => {
                             ──────────────────────────────────────────────── */}
                         </div>
 
-                         {/* Type hint message */}
+                        {/* Type hint message */}
                         <p className="type-hint">
-                           {/* {form.task_type === 4 &&
+                            {/* {form.task_type === 4 &&
                                 '🎲 Random — Set a start date. End date is optional.'}
                             {form.task_type === 5 &&
                                 '⏱️ Time Bound — Requires start & end date with exact times.'}
@@ -518,11 +530,11 @@ const CreateTaskPage = () => {
                             {form.task_type === 2 && '📆 Weekly — Runs on a chosen day each week.'}
                             {form.task_type === 3 && '🗓️ Monthly — Runs once every month.'}
                             */}
-                        </p>  
-        
+                        </p>
+
                     </div>
 
-                    
+
                     {/* ── RANDOM (4): Start Date only ─────────── */}
                     {form.task_type === 4 && (
                         <div className="form-group">
@@ -648,16 +660,19 @@ const CreateTaskPage = () => {
                                     <button
                                         key={p.value}
                                         type="button"
-                                        className={`toggle-btn priority-btn ${
-                                            isActive ? 'priority-btn-active' : ''
-                                        }`}
+                                        className={`toggle-btn priority-btn ${isActive ? 'priority-btn-active' : ''
+                                            }`}
                                         style={isActive
-                                            ? { background: p.color,
+                                            ? {
+                                                background: p.color,
                                                 borderColor: p.color,
-                                                color: 'white' }
-                                            : { borderColor: p.color,
+                                                color: 'white'
+                                            }
+                                            : {
+                                                borderColor: p.color,
                                                 color: p.color,
-                                                background: p.bg }
+                                                background: p.bg
+                                            }
                                         }
                                         onClick={() => setField('priority_type', p.value)}
                                     >
@@ -736,7 +751,7 @@ const CreateTaskPage = () => {
                         SECTION 5: Employee Assignment
                         Search by ID or Name (single input)
                     ══════════════════════════════════════════ */}
-                    
+
                     <div className="form-group" ref={dropdownRef}>
                         <label className="form-label">
                             Assign To <span className="req">*</span>
@@ -776,11 +791,10 @@ const CreateTaskPage = () => {
                                         return (
                                             <label
                                                 key={emp.emp_id}
-                                                className={`emp-row ${
-                                                    isChecked
-                                                        ? 'emp-row-checked'
-                                                        : ''
-                                                }`}
+                                                className={`emp-row ${isChecked
+                                                    ? 'emp-row-checked'
+                                                    : ''
+                                                    }`}
                                             >
                                                 <input
                                                     type="checkbox"
@@ -808,7 +822,7 @@ const CreateTaskPage = () => {
                                         e => e.emp_id === id
                                     );
                                     return (
-                                            <span key={id} className="chip">
+                                        <span key={id} className="chip">
                                             {emp?.emp_name || id}{emp?.emp_department ? ` — ${emp.emp_department}` : ''}
                                             <button
                                                 type="button"

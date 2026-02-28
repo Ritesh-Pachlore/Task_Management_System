@@ -118,25 +118,9 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
 
                 {actionModal?.actionType === 'edit' && (
                     <>
-                        {/* Previously assigned employees */}
-                        <div className="form-group">
-                            <label>Previously assigned to</label>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                {(() => {
-                                    const t = actionModal.task || {};
-                                    if (t.emp_names) return String(t.emp_names).split(',').map((n, i) => (<span key={i} className="chip">{n.trim()}</span>));
-                                    if (t.emp_name) return (<span className="chip">{t.emp_name}</span>);
-                                    return selectedEmployees.map(id => {
-                                        const e = employees.find(x => x.emp_id === id);
-                                        return (<span key={id} className="chip">{e ? e.emp_name : id}</span>);
-                                    });
-                                })()}
-                            </div>
-                        </div>
-
                         {/* Add/Remove Employees */}
                         <div className="form-group">
-                            <label>Add/Remove Employees</label>
+                            <label>Assigned Employees</label>
                             <div style={{ position: 'relative' }}>
                                 <input
                                     ref={empInputRef}
@@ -168,12 +152,37 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
                             </div>
 
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                                {selectedEmployees.map(id => {
-                                    const e = employees.find(x => x.emp_id === id);
-                                    return (
-                                        <span key={id} className="chip">{e ? e.emp_name : id}</span>
-                                    );
-                                })}
+                                {(() => {
+                                    const t = actionModal.task || {};
+                                    const assignedIds = String(t.emp_list || t.assigned_emp_list || '').split(',').map(s => parseInt(s)).filter(Boolean);
+                                    const assignedNames = String(t.emp_names || t.emp_name || '').split(',');
+
+                                    return selectedEmployees.map(id => {
+                                        const e = employees.find(x => x.emp_id === id);
+                                        let empName = id;
+                                        if (e) {
+                                            empName = e.emp_name;
+                                        } else {
+                                            const idx = assignedIds.indexOf(id);
+                                            if (idx !== -1 && assignedNames[idx]) {
+                                                empName = assignedNames[idx].trim();
+                                            }
+                                        }
+                                        return (
+                                            <span key={id} className="chip" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                {empName}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleEmployee(id)}
+                                                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, fontSize: '14px', lineHeight: 1, marginLeft: '4px' }}
+                                                    title={`Remove ${empName}`}
+                                                >
+                                                    ×
+                                                </button>
+                                            </span>
+                                        );
+                                    });
+                                })()}
                             </div>
 
                             {showEmpList && (
