@@ -1,13 +1,15 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_get_task_history]    Script Date: 28-02-2026 10:10:00 ******/
+
+/****** Object:  StoredProcedure [dbo].[sp_get_task_history]    Script Date: 20-02-2026 11:38:56 ******/
 SET ANSI_NULLS ON
 GO
+
 SET QUOTED_IDENTIFIER ON
 GO
 
 
-ALTER PROCEDURE [dbo].[sp_get_task_history]
+CREATE PROCEDURE [dbo].[sp_get_task_history]
     @execution_log_id BIGINT
 AS
 BEGIN
@@ -34,3 +36,5 @@ BEGIN
     WHERE h.execution_log_id = @execution_log_id
     ORDER BY h.action_at ASC;
 END
+GO
+

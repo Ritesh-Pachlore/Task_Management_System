@@ -16,6 +16,9 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
     const empListRef = useRef(null);
     const empInputRef = useRef(null);
 
+
+    const [attachments, setAttachments] = useState([]);
+
     // Initialize modal data when opening
     useEffect(() => {
         if (actionModal?.actionType === 'edit' && actionModal.task) {
@@ -32,6 +35,9 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
 
             fetchEmployees(''); // load employee names
         }
+
+        // Reset attachments when modal is opened for any action
+        setAttachments([]);
     }, [actionModal]);
 
     // Employee search
@@ -73,37 +79,78 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
         );
     };
 
-    // ✅ Fixed handleSubmit for edit action
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files);
+        const validFiles = [];
+
+        for (let file of files) {
+            const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(file.name);
+            const maxSize = isImage ? 50 * 1024 : 2 * 1024 * 1024;
+
+            if (file.size > maxSize) {
+                const limitStr = isImage ? '50 KB' : '2 MB';
+                toast.error(`Upload failed: "${file.name}" exceeds the maximum allowed size of ${limitStr}.`);
+                continue;
+            }
+            validFiles.push(file);
+        }
+
+        setAttachments(prev => [...prev, ...validFiles]);
+        e.target.value = null;
+    };
+
+    const removeFile = (index) => {
+        setAttachments(prev => prev.filter((_, i) => i !== index));
+    };
+
+    // ✅ Fixed handleSubmit for actions
     const handleSubmit = () => {
-        const payload = {
-            execution_log_id: actionModal.task?.execution_log_id, // required
-            title: taskTitle.trim(),
-            description: taskDescription.trim(),
-        };
+        if (actionModal?.actionType === 'edit') {
+            const payload = {
+                execution_log_id: actionModal.task?.execution_log_id,
+                title: taskTitle.trim(),
+                description: taskDescription.trim(),
+            };
 
-        if (selectedEmployees.length > 0) {
-            payload.emp_list = selectedEmployees.join(',');
-        }
+            if (selectedEmployees.length > 0) {
+                payload.emp_list = selectedEmployees.join(',');
+            }
 
-        if (extendedDate) {
-            payload.deadline = extendedDate;
-        }
+            if (extendedDate) {
+                payload.deadline = extendedDate;
+            }
 
-        // Validate required fields before sending
-        if (!payload.execution_log_id) {
-            toast.error("Task not found");
-            return;
-        }
-        if (!payload.title) {
-            toast.error("Title is required");
-            return;
-        }
-        if (!payload.description) {
-            toast.error("Description is required");
-            return;
-        }
+            if (!payload.execution_log_id) {
+                toast.error("Task not found");
+                return;
+            }
+            if (!payload.title) {
+                toast.error("Title is required");
+                return;
+            }
+            if (!payload.description) {
+                toast.error("Description is required");
+                return;
+            }
+            onSubmit(payload);
+        } else {
+            // For submit, start, reject, approve, extend, resubmit, etc.
+            if (actionModal?.actionType === 2 || actionModal?.actionType === 5) {
+                // If it's a Submit (2) or Resubmit (5) action, send FormData
+                const formData = new FormData();
+                if (remarks) formData.append('remarks', remarks);
+                if (extendedDate) formData.append('extended_date', extendedDate);
 
-        onSubmit(payload);
+                attachments.forEach(file => {
+                    formData.append('attachments', file);
+                });
+
+                onSubmit(formData, !!attachments.length);
+            } else {
+                // Regular payload for other actions
+                onSubmit({ remarks, extendedDate });
+            }
+        }
     };
 
     const clearSearch = () => setEmpSearch('');
@@ -269,6 +316,39 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
                         rows={3}
                     />
                 </div>
+
+                {(actionModal?.actionType === 2 || actionModal?.actionType === 5) && (
+                    <div className="form-group">
+                        <label>Attach Documents <small style={{ color: "#6c757d", fontWeight: "normal" }}>(Optional)</small></label>
+                        <small style={{ display: 'block', color: "#6c757d", marginBottom: '6px' }}>
+                            Maximum size: Images up to 50 KB. Documents up to 2 MB.
+                        </small>
+                        <input
+                            type="file"
+                            multiple
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
+                            className="form-control"
+                            onChange={handleFileChange}
+                        />
+
+                        {attachments.length > 0 && (
+                            <div className="file-preview-list" style={{ marginTop: '10px' }}>
+                                {attachments.map((file, index) => (
+                                    <div key={index} className="file-preview-item" style={{ display: 'inline-flex', alignItems: 'center', background: '#f8f9fa', padding: '4px 8px', borderRadius: '4px', border: '1px solid #dee2e6', marginRight: '8px', marginBottom: '8px', fontSize: '13px' }}>
+                                        📄 {file.name}
+                                        <button
+                                            type="button"
+                                            onClick={() => removeFile(index)}
+                                            style={{ marginLeft: '8px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#ff4d4f', fontWeight: 'bold' }}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="modal-footer">
                     <button className="btn btn-outline" onClick={onClose}>

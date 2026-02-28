@@ -65,7 +65,8 @@ class CreateTaskView(APIView):
             if not data.get('task_title', '').strip():
                 return error_response("task_title is required")
 
-            if not data.get('task_start_date'):
+            # task_start_date is required, EXCEPT for Daily tasks which default to today
+            if not data.get('task_start_date') and task_type != TaskType.DAILY:
                 return error_response("task_start_date is required")
 
             if not data.get('emp_list'):
@@ -89,29 +90,32 @@ class CreateTaskView(APIView):
                     return error_response(
                         "end_time must be after start_time on the same day")
 
+            elif task_type in [TaskType.DAILY, TaskType.WEEKLY, TaskType.MONTHLY]:
+                # Recurring tasks: end_date is now optional, default to infinite handled in services
+                pass
+                
+                # Check for recurrence_end_date (optional but recommended)
+                # Actually, in our scheme, task_end_date is the date of the FIRST instance, 
+                # but for recurring, we'll use it as the pattern start if start_date is used.
+                # Let's keep it simple.
+                
+                if task_type == TaskType.WEEKLY:
+                    if not data.get('weekly_days'):
+                        return error_response("weekly_days is required for Weekly tasks")
+                
+                elif task_type == TaskType.MONTHLY:
+                    if not data.get('monthly_day_of_month'):
+                        return error_response("monthly_day_of_month is required for Monthly tasks")
+
             elif task_type == TaskType.RANDOM:
                 # RANDOM: end_date optional, times not needed
-                # If no end_date given → SP will use start_date
                 pass
-
-            # ── FUTURE validations (not active yet) ─────────────
-            # elif task_type == TaskType.DAILY:
-            #     if not data.get('task_end_date'):
-            #         return error_response("task_end_date required for Daily")
-
-            # elif task_type == TaskType.WEEKLY:
-            #     if not data.get('day_of_week'):
-            #         return error_response("day_of_week required for Weekly")
-
-            # elif task_type == TaskType.MONTHLY:
-            #     if not data.get('task_end_date'):
-            #         return error_response("task_end_date required for Monthly")
 
             else:
                 # Unknown task type
                 return error_response(
                     f"Invalid task_type: {task_type}. "
-                    f"Valid: 4 (Random), 5 (Time Bound)")
+                    f"Valid: 1(Daily), 2(Weekly), 3(Monthly), 4(Random), 5(Time Bound)")
             # ────────────────────────────────────────────────────
 
             result = services.create_task(
@@ -120,6 +124,11 @@ class CreateTaskView(APIView):
                 created_by_name = request.user.emp_name,
                 attachments     = files,
             )
+            
+            # SP result is a list with one dict
+            if result and result[0].get('success') == 0:
+                return error_response(result[0].get('message', 'Failed to create task'))
+
             return success_response(
                 data    = result,
                 message = "Task created successfully",
@@ -235,16 +244,20 @@ class UpdateTaskStatusView(APIView):
     def post(self, request):
         try:
             data = request.data
+            files = request.FILES.getlist('attachments')
+            
             if 'execution_log_id' not in data:
                 return error_response("execution_log_id required")
             if 'action_type' not in data:
                 return error_response("action_type required")
+            
             result = services.update_task_status(
                 data['execution_log_id'],
                 data['action_type'],
                 request.user.emp_id,
                 data.get('remarks', ''),
                 request.user.emp_name,
+                files, # Pass files to service
             )
             return success_response(data=result, message="Status updated")
         except Exception as e:
@@ -293,33 +306,14 @@ class DashboardView(APIView):
     """GET /api/tasks/dashboard/?view=SELF|ASSIGNED_BY_ME"""
     authentication_classes = [StandaloneTokenAuthentication]
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
         try:
             view_type = request.query_params.get('view', 'SELF')
             if view_type not in ['SELF', 'ASSIGNED_BY_ME']:
                 view_type = 'SELF'
-            # Parse optional filters and forward them safely. Empty strings -> None.
-            date_from = request.query_params.get('date_from') or None
-            date_to = request.query_params.get('date_to') or None
-            employee_id = request.query_params.get('employee_id')
-            if employee_id is not None and employee_id != '':
-                try:
-                    employee_id = int(employee_id)
-                except Exception:
-                    employee_id = None
-            else:
-                employee_id = None
-
-            try:
-                if date_from or date_to or employee_id:
-                    result = services.get_dashboard_counts(
-                        request.user.emp_id, view_type, date_from, date_to, employee_id)
-                else:
-                    result = services.get_dashboard_counts(
-                        request.user.emp_id, view_type)
-            except Exception as e:
-                return error_response(message=f"Dashboard fetch failed: {str(e)}")
-
+            result = services.get_dashboard_counts(
+                request.user.emp_id, view_type)
             return success_response(data=result)
         except Exception as e:
             return error_response(message=str(e))
@@ -327,6 +321,8 @@ class DashboardView(APIView):
 
 class CheckDateView(APIView):
     """GET /api/tasks/check-date/?date=2025-07-06"""
+    permission_classes = [IsAuthenticated] # Or AllowAny if this should be public
+
     def get(self, request):
         try:
             d = request.query_params.get('date')

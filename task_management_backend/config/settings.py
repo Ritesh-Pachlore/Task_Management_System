@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'corsheaders',             # CORS for React
     'apps.authentication',     # Our auth app
     'apps.tasks',              # Our tasks app
+   # 'django_apscheduler',      # Database-backed scheduler
 ]
 
 
@@ -98,6 +99,14 @@ JWT_SECRET_KEY = "standalone-task-mgmt-secret-key-2025"
 JWT_EXPIRATION_HOURS = 24    # Token valid for 24 hours
 
 
+# ASGI_APPLICATION = 'config.asgi.application'
+# CHANNEL_LAYERS = {
+#     'default': {'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#                 'CONFIG': {"hosts": [('127.0.0.1', 6379)]}},
+# }
+
+
+
 # ════════════════════════════════════════
 # OTHER SETTINGS
 # ════════════════════════════════════════
@@ -156,11 +165,7 @@ TEMPLATES = [
 #     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
 # }
 # SHARED_SECRET_KEY = "your-shared-secret-key-must-match-java"  # ⚠️ CHANGE
-# ASGI_APPLICATION = 'config.asgi.application'
-# CHANNEL_LAYERS = {
-#     'default': {'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#                 'CONFIG': {"hosts": [('127.0.0.1', 6379)]}},
-# }
+
 # ROOT_URLCONF = 'config.urls'
 # DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # STATIC_URL = 'static/'

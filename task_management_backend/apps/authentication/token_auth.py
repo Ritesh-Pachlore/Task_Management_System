@@ -80,3 +80,4 @@ class StandaloneTokenAuthentication(BaseAuthentication):
         except jwt.InvalidTokenError as e:
             print(f"DEBUG: Invalid Token: {str(e)}")
             raise AuthenticationFailed('Invalid token.')
+        

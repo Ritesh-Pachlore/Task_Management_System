@@ -8,14 +8,10 @@ class TaskType:
 
 
  # Active types (shown in UI)
-    ACTIVE_TYPES = [4, 5]
-
-    # Future types (UI placeholder only)
-    # FUTURE_TYPES = [1, 2, 3]
+    ACTIVE_TYPES = [1, 2, 3, 4, 5]
 
     # Types where end_date is required
-    REQUIRES_END_DATE = [5]
-    # Future: [1, 2, 3, 5]
+    REQUIRES_END_DATE = [1, 2, 3, 5]
 
     # Only TIME_BOUND stores actual times in datetime fields
     REQUIRES_TIME = [5]

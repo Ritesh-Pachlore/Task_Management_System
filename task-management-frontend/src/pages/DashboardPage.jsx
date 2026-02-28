@@ -1,3 +1,4 @@
+
 // src/pages/DashboardPage.jsx
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -42,17 +43,31 @@ const DashboardPage = () => {
             if (selectedEmp && viewType === 'ASSIGNED_BY_ME')
                 params.set('employee_id', selectedEmp);
 
-            const response = await api.get(`/tasks/dashboard/?${params.toString()}`);
+            const url = `/tasks/dashboard/?${params.toString()}`;
+            console.log(`🔄 Fetching dashboard data from: ${url}`);
+
+            const response = await api.get(url);
+
             if (response.data.success) {
                 const d = response.data.data;
+                console.log('✅ Dashboard data loaded successfully:', d);
                 setData(d);
                 // Build employee list from summary only on unfiltered first load
                 if (!selectedEmp && d.employee_summary?.length) {
                     employeeListRef.current = d.employee_summary;
                 }
+            } else {
+                console.error('❌ API returned success=false:', response.data);
+                toast.error(response.data.message || 'Failed to load dashboard');
             }
         } catch (error) {
-            toast.error('Failed to load dashboard');
+            console.error('❌ Error fetching dashboard:', {
+                status: error.response?.status,
+                message: error.response?.data?.message || error.message,
+                details: error.response?.data,
+                url: error.config?.url,
+            });
+            toast.error('Failed to load dashboard: ' + (error.response?.data?.message || error.message));
         }
         setLoading(false);
     }, [viewType, dateFrom, dateTo, selectedEmp]);
@@ -73,23 +88,36 @@ const DashboardPage = () => {
             if (label === 'In Progress') params.set('status', 1);
             else if (label === 'Submitted') params.set('status', 2);
             else if (label === 'Approved') params.set('status', 3);
+            else if (label === 'Pending') params.set('status', 0);
             else if (label === 'Overdue') params.set('overdue_only', 1);
 
-            const response = await api.get(`${endpoint}?${params.toString()}`);
+            const url = `${endpoint}?${params.toString()}`;
+            console.log(`🔄 Fetching filtered tasks from: ${url}`, { label, viewType });
+
+            const response = await api.get(url);
             if (response.data.success) {
+                console.log(`✅ Filtered tasks loaded for "${label}":`, response.data.data);
                 setFilteredTasks(response.data.data || []);
+            } else {
+                console.error(`❌ Failed to fetch "${label}" tasks:`, response.data);
+                toast.error(response.data.message || 'Failed to load tasks');
             }
         } catch (error) {
-            toast.error('Failed to load filtered tasks');
+            console.error(`❌ Error fetching "${label}" tasks:`, {
+                status: error.response?.status,
+                message: error.response?.data?.message || error.message,
+                details: error.response?.data,
+            });
+            toast.error('Failed to load tasks: ' + (error.response?.data?.message || error.message));
         }
         setFilteredLoading(false);
-    }, [viewType, selectedEmp, dateFrom, dateTo]);
+    }, [viewType, dateFrom, dateTo, selectedEmp]);
 
     useEffect(() => {
         fetchDashboard();
         setSelectedLabel(null);
         setFilteredTasks([]);
-    }, [fetchDashboard, selectedEmp]);
+    }, [fetchDashboard]);
 
     useEffect(() => {
         if (selectedLabel) {
@@ -118,7 +146,6 @@ const DashboardPage = () => {
     if (!data) return null;
 
     const counts = data.overall_counts || {};
-
     const getDeptName = (item) => {
         if (!item) return '';
         const candidates = [
@@ -135,6 +162,7 @@ const DashboardPage = () => {
 
     const statsCards = [
         { label: 'Total', value: counts.total_tasks, icon: <MdAssignment />, color: '#4361ee' },
+        { label: 'Pending', value: counts.pending_count, icon: <MdSchedule />, color: '#FF9800' },
         { label: 'In Progress', value: counts.in_progress_count, icon: <MdTrendingUp />, color: '#2196F3' },
         { label: 'Submitted', value: counts.submitted_count, icon: <MdSchedule />, color: '#FF9800' },
         { label: 'Approved', value: counts.approved_count, icon: <MdCheckCircle />, color: '#4CAF50' },
@@ -263,10 +291,9 @@ const DashboardPage = () => {
                                                 setSelectedEmp(emp.emp_id);
                                                 setEmpSearch(emp.emp_name);
                                                 setShowEmpDropdown(false);
-                                                setSelectedLabel(null);
                                             }}
                                         >
-                                            {emp.emp_name}{getDeptName(emp) ? ` — ${getDeptName(emp)}` : ''}
+                                            {emp.emp_name}
                                         </div>
                                     ))}
                             </div>
@@ -279,7 +306,7 @@ const DashboardPage = () => {
                     <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                         <button
                             onClick={() => {
-                                setDateFrom(''); setDateTo(''); setSelectedEmp(''); setEmpSearch('');
+                                setDateFrom(''); setDateTo(''); setSelectedEmp('');
                             }}
                             style={{
                                 padding: '8px 18px', borderRadius: 6,
@@ -330,8 +357,6 @@ const DashboardPage = () => {
                 </div>
             )}
 
-            {/* Selected Employee Indicator */}
-            {/* Selected employee indicator removed — selection still filters dashboard */}
 
             {/* Stats cards */}
             <div className="stats-grid">
@@ -386,19 +411,19 @@ const DashboardPage = () => {
                                 <table>
                                     <thead>
                                         <tr>
-                                                <th>Employee</th>
-                                                <th>Department</th>
-                                                <th>Task Title</th>
-                                                <th>Description</th>
-                                                <th>Priority</th>
-                                                <th>End Date</th>
-                                                <th>Due by</th>
+                                            <th>Employee</th>
+                                            <th>Department</th>
+                                            <th>Task Title</th>
+                                            <th>Description</th>
+                                            <th>Priority</th>
+                                            <th>End Date</th>
+                                            <th>Due by</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {filteredTasks.length === 0 ? (
                                             <tr>
-                                                    <td colSpan="7" style={{ textAlign: 'center', padding: 20, color: '#999' }}>
+                                                <td colSpan="6" style={{ textAlign: 'center', padding: 20, color: '#999' }}>
                                                     No tasks found for this status
                                                 </td>
                                             </tr>
@@ -407,7 +432,7 @@ const DashboardPage = () => {
                                                 const isOverdue = task.is_overdue === 1 || task.is_overdue === true;
                                                 return (
                                                     <tr key={task.execution_log_id}>
-                                                            <td
+                                                        <td
                                                             style={{
                                                                 fontWeight: 500,
                                                                 color: viewType === 'ASSIGNED_BY_ME' ? '#4361ee' : 'inherit',
@@ -421,7 +446,27 @@ const DashboardPage = () => {
                                                                 }
                                                             }}
                                                         >
-                                                            {task.emp_name || 'Unassigned'}
+                                                            {/* {task.emp_name || 'Unassigned'}
+                                                        </td>
+                                                        <td>{task.task_title}</td>
+                                                        <td style={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {task.task_description}
+                                                        </td>
+                                                        <td>
+                                                            <span style={{
+                                                                padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                                                                background: task.priority_type === 3 ? '#ffebee' : task.priority_type === 2 ? '#fff3e0' : '#e8f5e9',
+                                                                color: task.priority_type === 3 ? '#f44336' : task.priority_type === 2 ? '#ff9800' : '#4caf50'
+                                                            }}>
+                                                                {task.priority_type === 3 ? 'HIGH' : task.priority_type === 2 ? 'MEDIUM' : 'LOW'}
+                                                            </span>
+                                                        </td>
+                                                        <td>{formatDate(task.effective_deadline)}</td>
+                                                        <td style={{ color: isOverdue ? '#f44336' : '#999', fontWeight: isOverdue ? 600 : 400 }}>
+                                                            {getDaysText(task.days_remaining) || '-'}
+                                                        </td>
+                                                    </tr> */}
+                                                    {task.emp_name || 'Unassigned'}
                                                         </td>
                                                             <td>{getDeptName(task) || 'N/A'}</td>
                                                         <td>{task.task_title}</td>
@@ -536,28 +581,22 @@ const DashboardPage = () => {
                                 </thead>
                                 <tbody>
                                     {data.employee_summary.map((emp, idx) => (
-                                        <tr key={idx} style={{ background: selectedEmp === emp.emp_id ? '#e8ecff' : 'transparent', fontWeight: selectedEmp === emp.emp_id ? 600 : 400 }}>
+                                        <tr key={idx}>
                                             <td
-                                                    style={{
-                                                        fontWeight: 500,
-                                                        color: '#4361ee',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                    onClick={() => {
-                                                        if (selectedEmp === emp.emp_id) {
-                                                            setSelectedEmp('');
-                                                            setEmpSearch('');
-                                                        } else {
-                                                            setSelectedEmp(emp.emp_id);
-                                                            setEmpSearch(emp.emp_name);
-                                                        }
-                                                        setSelectedLabel(null);
-                                                    }}
-                                                >
-                                                    {emp.emp_name}
-                                                </td>
-                                                <td>{getDeptName(emp) || 'N/A'}</td>
-                                                <td>{emp.total_tasks}</td>
+                                                style={{
+                                                    fontWeight: 500,
+                                                    color: '#4361ee',
+                                                    cursor: 'pointer'
+                                                }}
+                                                onClick={() => {
+                                                    setSelectedEmp(emp.emp_id);
+                                                    setEmpSearch(emp.emp_name);
+                                                }}
+                                            >
+                                                {emp.emp_name}
+                                            </td>
+                                            <td>{getDeptName(emp) || 'N/A'}</td>   
+                                            <td>{emp.total_tasks}</td>
                                             <td style={{ color: '#4CAF50' }}>
                                                 {emp.completed}
                                             </td>

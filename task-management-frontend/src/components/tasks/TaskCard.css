@@ -8,7 +8,7 @@
 }
 
 .task-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .task-card-overdue {
@@ -34,13 +34,15 @@
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(47,107,237,0.15);
+    box-shadow: 0 4px 10px rgba(47, 107, 237, 0.15);
 }
+
 .task-edit-btn:hover {
     background: #2558d6;
 }
+
 .task-edit-btn:focus {
-    outline: 2px solid rgba(47,107,237,0.2);
+    outline: 2px solid rgba(47, 107, 237, 0.2);
 }
 
 .task-card-badges {
@@ -95,8 +97,29 @@
     border-top: 1px solid #f0f0f0;
 }
 
-.text-danger { color: #F44336; font-weight: 500; }
-.text-muted { color: #999; }
+.text-danger {
+    color: #F44336;
+    font-weight: 500;
+}
+
+.text-due-orange {
+    color: #FF9800;
+    font-weight: 500;
+}
+
+.text-due-yellow {
+    color: #FBC02D;
+    font-weight: 500;
+}
+
+.text-due-green {
+    color: #4CAF50;
+    font-weight: 500;
+}
+
+.text-muted {
+    color: #999;
+}
 
 @media (min-width: 768px) {
     .task-card-meta {
