@@ -1,6 +1,6 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_update_task_status]    Script Date: 27-02-2026 12:47:52 ******/
+/****** Object:  StoredProcedure [dbo].[sp_update_task_status]    Script Date: 28-02-2026 17:31:23 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -47,13 +47,14 @@ BEGIN
         -- Map action to new status
         SET @new_status =
             CASE @action_type
-                WHEN 1 THEN 1   -- STARTED
+                WHEN 1 THEN 1   -- STARTED (or RESUMED)
                 WHEN 2 THEN 2   -- SUBMITTED
-                WHEN 3 THEN 3   -- COMPLETED
+                WHEN 3 THEN 3   -- COMPLETED (APPROVED)
                 WHEN 4 THEN 4   -- REJECTED
                 WHEN 5 THEN 5   -- RESUBMITTED
                 WHEN 6 THEN 6   -- CANCELLED
                 WHEN 7 THEN @current_status -- EXTENDED (no status change)
+                WHEN 8 THEN 7   -- ON_HOLD
                 ELSE -1
             END;
 

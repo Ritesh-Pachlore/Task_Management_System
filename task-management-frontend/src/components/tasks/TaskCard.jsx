@@ -22,7 +22,7 @@ const getSuffix = (day) => {
 const TaskCard = ({ task, viewType, onAction }) => {
     const navigate = useNavigate();
 
-    const status = task.status;
+    const status = Number(task.status);
     // Overdue only if status is not Approved (3) or Cancelled (6)
     const isOverdue = (task.is_overdue === 1 || task.is_overdue === true) && ![3, 6].includes(status);
     const daysText = getDaysText(task.days_remaining);
@@ -33,9 +33,12 @@ const TaskCard = ({ task, viewType, onAction }) => {
 
     // Calculate Start Date differences
     const today = new Date();
-    const startDate = new Date(task.task_start_date);
     today.setHours(0, 0, 0, 0);
+
+    // Parse task_start_date robustly
+    const startDate = new Date(task.task_start_date);
     startDate.setHours(0, 0, 0, 0);
+
     const isFutureStart = startDate > today;
     const diffDaysToStart = Math.ceil(Math.abs(startDate - today) / (1000 * 60 * 60 * 24));
 
@@ -49,21 +52,16 @@ const TaskCard = ({ task, viewType, onAction }) => {
     };
 
     const getActions = () => {
-        const status = task.status;
+        const statusNum = Number(task.status);
         const actions = [];
 
         if (viewType === 'SELF') {
-            // Hide Start button if in the future
-            // if (status === 0 && !isFutureStart) {
-            //     actions.push({ type: 1, label: 'Start', cls: 'btn-primary' });
-            // }
-            // Hide Start button if in the future
-            if (status === 0 && !isFutureStart) {
+            if (statusNum === 0 && !isFutureStart) {
                 actions.push({ type: 1, label: 'Start', cls: 'btn-primary' });
             }
-            if (status === 1) actions.push({ type: 2, label: 'Submit', cls: 'btn-success' });
-            if (status === 4) actions.push({ type: 5, label: 'Resubmit', cls: 'btn-warning' });
-            if (status === 7) actions.push({ type: 1, label: 'Resume', cls: 'btn-primary' });
+            if (statusNum === 1) actions.push({ type: 2, label: 'Submit', cls: 'btn-success' });
+            if (statusNum === 4) actions.push({ type: 5, label: 'Resubmit', cls: 'btn-warning' });
+            if (statusNum === 7) actions.push({ type: 1, label: 'Resume', cls: 'btn-primary' });
         }
 
         if (viewType === 'ASSIGNED_BY_ME') {

@@ -1,6 +1,6 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_fetch_task_list]    Script Date: 26-02-2026 10:03:01 ******/
+/****** Object:  StoredProcedure [dbo].[sp_fetch_task_list]    Script Date: 28-02-2026 17:29:47 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -74,7 +74,7 @@ BEGIN
          WHERE EMP_ID = el.assigned_by) AS assigned_by_name,
 
         -- UPDATED: standardized to el.task_status
-        el.task_status,
+        el.task_status AS status,
         CASE el.task_status
             WHEN 0 THEN 'ASSIGNED'
             WHEN 1 THEN 'STARTED'
@@ -83,6 +83,7 @@ BEGIN
             WHEN 4 THEN 'REJECTED'
             WHEN 5 THEN 'RESUBMITTED'
             WHEN 6 THEN 'CANCELLED'
+            WHEN 7 THEN 'ON HOLD'
         END AS status_name,
 
         el.started_at,
@@ -130,7 +131,7 @@ BEGIN
     LEFT JOIN recurrence_pattern rp  ON td.task_id = rp.task_id
 
     WHERE td.is_active = 1
-      AND el.status <> 6
+      AND el.task_status <> 6
       AND (
             (@view_type = 'SELF' AND el.emp_id = @emp_id)
          OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id)

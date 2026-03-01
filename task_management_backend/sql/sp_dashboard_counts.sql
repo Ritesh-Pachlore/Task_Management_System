@@ -1,3 +1,11 @@
+USE [DButilities]
+GO
+/****** Object:  StoredProcedure [dbo].[sp_dashboard_counts]    Script Date: 28-02-2026 17:28:59 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
 ALTER PROCEDURE [dbo].[sp_dashboard_counts]
     @emp_id      BIGINT,
     @view_type   NVARCHAR(50),
@@ -25,7 +33,7 @@ BEGIN
                  AND el.task_status NOT IN (3, 6) THEN 1 ELSE 0 END) AS overdue_count,
         SUM(CASE WHEN el.task_status NOT IN (3, 6)
                  AND COALESCE(el.extended_date, td.task_end_date) >= GETDATE()
-                 AND dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE), el.emp_id) = 1
+                 AND dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE)) = 1
                  THEN 1 ELSE 0 END) AS holiday_affected_count
     FROM task_execution_log el
     INNER JOIN task_details td ON el.task_id = td.task_id
@@ -33,7 +41,6 @@ BEGIN
       AND el.task_status <> 6
       AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)
            OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id))
-      -- ↓ NEW: date filter on task_end_date
       AND (@date_from IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to   IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id);
@@ -68,7 +75,7 @@ BEGIN
         WHERE el.assigned_by = @emp_id AND td.is_active = 1 AND el.task_status <> 6
           AND (@date_from    IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
           AND (@date_to      IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
-          AND (@employee_id  IS NULL OR el.emp_id = @employee_id)   -- ← NEW
+          AND (@employee_id  IS NULL OR el.emp_id = @employee_id)
         GROUP BY el.emp_id ORDER BY overdue DESC;
     END
     ELSE
@@ -91,11 +98,12 @@ BEGIN
             WHEN 4 THEN 'REJECTED'
             WHEN 5 THEN 'RESUBMITTED'
             WHEN 6 THEN 'CANCELLED'
+            WHEN 7 THEN 'ON HOLD'
         END AS status_name,
         COUNT(*) AS value,
         CASE el.task_status WHEN 0 THEN '#8884d8' WHEN 1 THEN '#82ca9d' WHEN 2 THEN '#ffc658'
             WHEN 3 THEN '#00C49F' WHEN 4 THEN '#FF6B6B' WHEN 5 THEN '#FFBB28'
-            WHEN 6 THEN '#999999' END AS color
+            WHEN 6 THEN '#999999' WHEN 7 THEN '#673AB7' END AS color
     FROM task_execution_log el
     INNER JOIN task_details td ON el.task_id = td.task_id
     WHERE td.is_active = 1 AND el.task_status <> 6
@@ -104,7 +112,6 @@ BEGIN
       AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)
-
     GROUP BY el.task_status;
 
 
@@ -130,7 +137,6 @@ BEGIN
       AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)
-
     GROUP BY td.priority_type
     ORDER BY td.priority_type;
 
@@ -159,7 +165,6 @@ BEGIN
       AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)
-
     GROUP BY FORMAT(el.created_at, 'MMM yyyy'),
              FORMAT(el.created_at, 'yyyy-MM')
     ORDER BY sort_key;

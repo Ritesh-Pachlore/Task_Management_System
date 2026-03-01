@@ -1,6 +1,6 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_create_task]    Script Date: 27-02-2026 12:42:33 ******/
+/****** Object:  StoredProcedure [dbo].[sp_create_task]    Script Date: 28-02-2026 17:27:58 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -102,7 +102,7 @@ BEGIN
      --   IF @task_type NOT IN (1,2,3)
      --       SET @should_assign = 1;
      --   ELSE IF CAST(GETDATE() AS DATE) >= @task_start_date
-     --           AND dbo.fn_is_non_working_day(CAST(GETDATE() AS DATE), @emp_id) = 0
+     --           AND dbo.fn_is_non_working_day(CAST(GETDATE() AS DATE)) = 0
      --       SET @should_assign = 1;
 
         IF @should_assign = 1
@@ -118,7 +118,7 @@ BEGIN
             WHILE @@FETCH_STATUS = 0
             BEGIN
                 INSERT INTO task_execution_log (
-                    task_id, emp_id, assigned_by, status,
+                    task_id, emp_id, assigned_by, task_status,
                     started_at, extended_date, rejection_count,
                     created_at, updated_at
                 )

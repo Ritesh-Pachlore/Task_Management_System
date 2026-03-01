@@ -257,7 +257,7 @@ def update_task_status(execution_log_id, action_type,
                 info.get('assigned_by'), remarks,
                 status_name, action_by_name,
             )
-        elif action_type in [3, 4, 6, 7]:
+        elif action_type in [3, 4, 6, 7, 8]:
             notify_status_changed(
                 info.get('emp_id'), remarks,
                 status_name, action_by_name,

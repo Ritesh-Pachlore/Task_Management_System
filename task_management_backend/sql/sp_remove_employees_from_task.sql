@@ -1,6 +1,6 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_remove_employee_from_task]    Script Date: 28-02-2026 10:10:37 ******/
+/****** Object:  StoredProcedure [dbo].[sp_remove_employee_from_task]    Script Date: 28-02-2026 17:31:10 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON

@@ -6,6 +6,7 @@ export const STATUS_MAP = {
     4: { name: 'REJECTED', color: '#F44336', bg: '#FFEBEE' },
     5: { name: 'RESUBMITTED', color: '#FFC107', bg: '#FFF8E1' },
     6: { name: 'CANCELLED', color: '#9E9E9E', bg: '#F5F5F5' },
+    7: { name: 'ON HOLD', color: '#673AB7', bg: '#EDE7F6' },
 };
 
 export const PRIORITY_MAP = {
@@ -28,7 +29,7 @@ export const STATUS_OPTIONS = [
     { value: 4, label: 'Rejected' },
     { value: 5, label: 'Resubmitted' },
     { value: 6, label: 'Cancelled' },
-    // { value: 7, label: 'On Hold' },
+    { value: 7, label: 'On Hold' },
 ];
 
 export const PRIORITY_OPTIONS = [
