@@ -22,7 +22,7 @@ const getSuffix = (day) => {
 const TaskCard = ({ task, viewType, onAction }) => {
     const navigate = useNavigate();
 
-    const status = Number(task.status);
+    const status = Number(task.task_status !== undefined ? task.task_status : task.status);
     // Overdue only if status is not Approved (3) or Cancelled (6)
     const isOverdue = (task.is_overdue === 1 || task.is_overdue === true) && ![3, 6].includes(status);
     const daysText = getDaysText(task.days_remaining);
@@ -52,16 +52,15 @@ const TaskCard = ({ task, viewType, onAction }) => {
     };
 
     const getActions = () => {
-        const statusNum = Number(task.status);
         const actions = [];
 
         if (viewType === 'SELF') {
-            if (statusNum === 0 && !isFutureStart) {
+            if (status === 0 && !isFutureStart) {
                 actions.push({ type: 1, label: 'Start', cls: 'btn-primary' });
             }
-            if (statusNum === 1) actions.push({ type: 2, label: 'Submit', cls: 'btn-success' });
-            if (statusNum === 4) actions.push({ type: 5, label: 'Resubmit', cls: 'btn-warning' });
-            if (statusNum === 7) actions.push({ type: 1, label: 'Resume', cls: 'btn-primary' });
+            if (status === 1) actions.push({ type: 2, label: 'Submit', cls: 'btn-success' });
+            if (status === 4) actions.push({ type: 5, label: 'Resubmit', cls: 'btn-warning' });
+            if (status === 7) actions.push({ type: 1, label: 'Resume', cls: 'btn-primary' });
         }
 
         if (viewType === 'ASSIGNED_BY_ME') {
@@ -92,11 +91,11 @@ const TaskCard = ({ task, viewType, onAction }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <PriorityBadge priority={task.priority_type} />
-                        <StatusBadge status={task.status} />
+                        <StatusBadge status={status} />
                         {task.extended_date && <span className="task-extended-tag">Extended</span>}
                     </div>
                     <div style={{ marginTop: 6, fontSize: 12, color: '#666' }}>
-                        {PRIORITY_MAP[task.priority_type]?.name || ''}{', '}{STATUS_MAP[task.status]?.name || ''}
+                        {PRIORITY_MAP[task.priority_type]?.name || ''}{', '}{STATUS_MAP[status]?.name || ''}
                     </div>
                 </div>
 

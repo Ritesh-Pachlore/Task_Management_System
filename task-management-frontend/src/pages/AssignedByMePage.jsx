@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
 import TaskCard from '../components/tasks/TaskCard';
+import GroupTaskCard from '../components/tasks/GroupTaskCard';
 import TaskFilters from '../components/tasks/TaskFilters';
 import ActionModal from '../components/common/ActionModal';
 import DateShiftModal from '../components/common/DateShiftModal';
@@ -59,7 +60,7 @@ const AssignedByMePage = () => {
                 3: 'Approve Task',
                 4: 'Reject Task',
                 6: 'Cancel Task',
-                8: 'Put On Hold',
+                7: 'Put On Hold',
             };
             setActionModal({
                 task,
@@ -206,14 +207,37 @@ const AssignedByMePage = () => {
                     <p>No assigned tasks</p>
                 </div>
             ) : (
-                tasks.map((task) => (
-                    <TaskCard
-                        key={task.execution_log_id}
-                        task={task}
-                        viewType="ASSIGNED_BY_ME"
-                        onAction={handleAction}
-                    />
-                ))
+                (() => {
+                    // Group tasks by group_id
+                    const groups = tasks.reduce((acc, t) => {
+                        const key = t.group_id || `ind_${t.execution_log_id}`;
+                        if (!acc[key]) acc[key] = [];
+                        acc[key].push(t);
+                        return acc;
+                    }, {});
+
+                    return Object.entries(groups).map(([key, groupMembers]) => {
+                        const isGroup = !key.startsWith('ind_');
+                        if (isGroup) {
+                            return (
+                                <GroupTaskCard
+                                    key={key}
+                                    members={groupMembers}
+                                    onAction={handleAction}
+                                />
+                            );
+                        } else {
+                            return (
+                                <TaskCard
+                                    key={key}
+                                    task={groupMembers[0]}
+                                    viewType="ASSIGNED_BY_ME"
+                                    onAction={handleAction}
+                                />
+                            );
+                        }
+                    });
+                })()
             )}
 
             {actionModal && (

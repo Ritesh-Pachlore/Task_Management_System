@@ -85,10 +85,10 @@ const DashboardPage = () => {
                 params.set('employee_id', selectedEmp);
             }
 
-            if (label === 'In Progress') params.set('status', 1);
-            else if (label === 'Submitted') params.set('status', 2);
-            else if (label === 'Approved') params.set('status', 3);
-            else if (label === 'Pending') params.set('status', 0);
+            if (label === 'In Progress') params.set('task_status', 1);
+            else if (label === 'Submitted') params.set('task_status', 2);
+            else if (label === 'Approved') params.set('task_status', 3);
+            else if (label === 'Pending') params.set('filter_group', 'PENDING');
             else if (label === 'Overdue') params.set('overdue_only', 1);
 
             const url = `${endpoint}?${params.toString()}`;
@@ -174,19 +174,51 @@ const DashboardPage = () => {
             {/* ── Header row: title + mode toggle ── */}
             <div className="page-header">
                 <h1>Dashboard</h1>
-                <select
-                    className="filter-select"
-                    value={viewType}
-                    onChange={(e) => {
-                        setViewType(e.target.value);
-                        // Reset filters when switching mode
-                        setDateFrom(''); setDateTo(''); setSelectedEmp('');
-                        employeeListRef.current = [];
-                    }}
-                >
-                    <option value="SELF">My Tasks</option>
-                    <option value="ASSIGNED_BY_ME">Assigned By Me</option>
-                </select>
+                <div style={{ display: 'flex', background: '#f1f3f9', padding: 4, borderRadius: 10 }}>
+                    <button
+                        style={{
+                            padding: '8px 20px',
+                            border: 'none',
+                            borderRadius: 8,
+                            fontSize: 14,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            background: viewType === 'SELF' ? '#fff' : 'transparent',
+                            color: viewType === 'SELF' ? '#4361ee' : '#666',
+                            boxShadow: viewType === 'SELF' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                        }}
+                        onClick={() => {
+                            setViewType('SELF');
+                            setDateFrom(''); setDateTo(''); setSelectedEmp('');
+                            employeeListRef.current = [];
+                        }}
+                    >
+                        My Tasks
+                    </button>
+                    <button
+                        style={{
+                            padding: '8px 20px',
+                            border: 'none',
+                            borderRadius: 8,
+                            fontSize: 14,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            background: viewType === 'ASSIGNED_BY_ME' ? '#fff' : 'transparent',
+                            color: viewType === 'ASSIGNED_BY_ME' ? '#4361ee' : '#666',
+                            boxShadow: viewType === 'ASSIGNED_BY_ME' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                            marginLeft: 4
+                        }}
+                        onClick={() => {
+                            setViewType('ASSIGNED_BY_ME');
+                            setDateFrom(''); setDateTo(''); setSelectedEmp('');
+                            employeeListRef.current = [];
+                        }}
+                    >
+                        Assigned By Me
+                    </button>
+                </div>
             </div>
 
             {/* ── Filter bar ── */}
@@ -309,7 +341,7 @@ const DashboardPage = () => {
                                 setDateFrom(''); setDateTo(''); setSelectedEmp('');
                             }}
                             style={{
-                                padding: '8px 18px', borderRadius: 6,
+                                shadow: 'none', padding: '8px 18px', borderRadius: 6,
                                 border: '1px solid #ccc', background: '#fff',
                                 fontSize: 14, cursor: 'pointer', color: '#666',
                             }}
@@ -412,6 +444,7 @@ const DashboardPage = () => {
                                     <thead>
                                         <tr>
                                             <th>Employee</th>
+                                            <th>Department</th>
                                             <th>Task Title</th>
                                             <th>Description</th>
                                             <th>Priority</th>
@@ -423,52 +456,91 @@ const DashboardPage = () => {
                                     <tbody>
                                         {filteredTasks.length === 0 ? (
                                             <tr>
-                                                <td colSpan="6" style={{ textAlign: 'center', padding: 20, color: '#999' }}>
+                                                <td colSpan="8" style={{ textAlign: 'center', padding: 20, color: '#999' }}>
                                                     No tasks found for this status
                                                 </td>
                                             </tr>
                                         ) : (
-                                            filteredTasks.map((task) => {
-                                                const isOverdue = task.is_overdue === 1 || task.is_overdue === true;
-                                                return (
-                                                    <tr key={task.execution_log_id}>
-                                                        <td
-                                                            style={{
-                                                                fontWeight: 500,
-                                                                color: viewType === 'ASSIGNED_BY_ME' ? '#4361ee' : 'inherit',
-                                                                cursor: viewType === 'ASSIGNED_BY_ME' ? 'pointer' : 'default'
-                                                            }}
-                                                            onClick={() => {
-                                                                if (viewType === 'ASSIGNED_BY_ME') {
-                                                                    setSelectedEmp(task.emp_id);
-                                                                    setEmpSearch(task.emp_name);
-                                                                    setSelectedLabel(null);
-                                                                }
-                                                            }}
-                                                        >
-                                                            {task.emp_name || 'Unassigned'}
-                                                        </td>
-                                                        <td>{task.task_title}</td>
-                                                        <td style={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                            {task.task_description}
-                                                        </td>
-                                                        <td>
-                                                            <span style={{
-                                                                padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-                                                                background: task.priority_type === 3 ? '#ffebee' : task.priority_type === 2 ? '#fff3e0' : '#e8f5e9',
-                                                                color: task.priority_type === 3 ? '#f44336' : task.priority_type === 2 ? '#ff9800' : '#4caf50'
-                                                            }}>
-                                                                {task.priority_type === 3 ? 'HIGH' : task.priority_type === 2 ? 'MEDIUM' : 'LOW'}
-                                                            </span>
-                                                        </td>
-                                                        <td>{formatDate(task.task_start_date) || 'N/A'}</td>
-                                                        <td>{formatDate(task.effective_deadline)}</td>
-                                                        <td style={{ color: isOverdue ? '#f44336' : '#999', fontWeight: isOverdue ? 600 : 400 }}>
-                                                            {getDaysText(task.days_remaining) || '-'}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
+                                            (() => {
+                                                // Group tasks by group_id (numeric BIGINT)
+                                                // Individual tasks use their execution_log_id as a unique key
+                                                const grouped = filteredTasks.reduce((acc, t) => {
+                                                    const key = t.group_id || `ind_${t.execution_log_id}`;
+                                                    if (!acc[key]) acc[key] = [];
+                                                    acc[key].push(t);
+                                                    return acc;
+                                                }, {});
+
+                                                return Object.entries(grouped).map(([key, groupMembers], gIdx) => {
+                                                    const isGroup = !key.startsWith('ind_');
+                                                    const bgColor = isGroup ? (gIdx % 2 === 0 ? '#f0f7ff' : '#f5faff') : 'transparent';
+
+                                                    return groupMembers.map((task, mIdx) => {
+                                                        const isOverdue = task.is_overdue === 1 || task.is_overdue === true;
+                                                        const isFirstInGroup = mIdx === 0;
+                                                        // Use task_status (from new SP) or fallback to status
+                                                        const currentStatus = task.task_status !== undefined ? task.task_status : task.status;
+
+                                                        return (
+                                                            <tr key={task.execution_log_id} style={{ background: bgColor }}>
+                                                                <td
+                                                                    style={{
+                                                                        fontWeight: 500,
+                                                                        color: viewType === 'ASSIGNED_BY_ME' ? '#4361ee' : 'inherit',
+                                                                        cursor: viewType === 'ASSIGNED_BY_ME' ? 'pointer' : 'default',
+                                                                        borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee'
+                                                                    }}
+                                                                    onClick={() => {
+                                                                        if (viewType === 'ASSIGNED_BY_ME') {
+                                                                            setSelectedEmp(task.emp_id);
+                                                                            setEmpSearch(task.emp_name);
+                                                                            setSelectedLabel(null);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    {task.emp_name || 'Unassigned'}
+                                                                    {task.is_team_lead === 1 && <span style={{ marginLeft: 5, fontSize: 10 }}>⭐</span>}
+                                                                </td>
+                                                                <td style={{ borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee' }}>
+                                                                    {getDeptName(task) || 'N/A'}
+                                                                </td>
+                                                                <td style={{ borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee' }}>
+                                                                    {isGroup && isFirstInGroup && <span style={{ color: '#4361ee', fontWeight: 'bold', marginRight: 5 }}>[G]</span>}
+                                                                    {task.task_title}
+                                                                </td>
+                                                                <td style={{
+                                                                    maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                                                    borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee'
+                                                                }}>
+                                                                    {task.task_description}
+                                                                </td>
+                                                                <td style={{ borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee' }}>
+                                                                    <span style={{
+                                                                        padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                                                                        background: task.priority_type === 3 ? '#ffebee' : task.priority_type === 2 ? '#fff3e0' : '#e8f5e9',
+                                                                        color: task.priority_type === 3 ? '#f44336' : task.priority_type === 2 ? '#ff9800' : '#4caf50'
+                                                                    }}>
+                                                                        {task.priority_type === 3 ? 'HIGH' : task.priority_type === 2 ? 'MEDIUM' : 'LOW'}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee' }}>
+                                                                    {formatDate(task.task_start_date) || 'N/A'}
+                                                                </td>
+                                                                <td style={{ borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee' }}>
+                                                                    {formatDate(task.effective_deadline)}
+                                                                </td>
+                                                                <td style={{
+                                                                    color: currentStatus === 3 ? '#4CAF50' : (isOverdue ? '#f44336' : '#999'),
+                                                                    fontWeight: currentStatus === 3 || isOverdue ? 600 : 400,
+                                                                    borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee'
+                                                                }}>
+                                                                    {currentStatus === 3 ? 'Completed' : (getDaysText(task.days_remaining) || '-')}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    });
+                                                });
+                                            })()
                                         )}
                                     </tbody>
                                 </table>

@@ -52,6 +52,8 @@ const INITIAL_FORM = {
     monthly_day_of_month: '',
     selectedEmployees: [],
     attachments: [],
+    assignMode: 'INDIVIDUAL', // 'INDIVIDUAL' or 'GROUP'
+    teamLeadEmpId: null,
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -294,7 +296,11 @@ const CreateTaskPage = () => {
 
             formData.append('emp_list', form.selectedEmployees.join(','));
 
-            // Recurrence Details
+            // Group Task Params - Send for all task types
+            formData.append('assign_mode', form.assignMode);
+            formData.append('team_lead_emp_id', form.teamLeadEmpId || '');
+
+            // Recurrence Details (IDs: 1=Daily, 2=Weekly, 3=Monthly)
             if ([1, 2, 3].includes(form.task_type)) {
                 formData.append('recurrence_type', String(form.task_type));
                 formData.append('recurrence_end_date', form.recurrence_end_date || INFINITE_DATE);
@@ -304,7 +310,7 @@ const CreateTaskPage = () => {
                     formData.append('monthly_day_of_month', 0);
                 } else if (form.task_type === 2) { // Weekly
                     formData.append('weekly_days', form.weekly_days.join(','));
-                    formData.append('monthly_day_of_month', 0);
+                    formData.append('monthly_day_of_month', form.monthly_day_of_month || 0);
                 } else if (form.task_type === 3) { // Monthly
                     formData.append('weekly_days', '0');
                     const d = new Date(finalStartDate);
@@ -608,26 +614,69 @@ const CreateTaskPage = () => {
                             </div>
                         )}
 
-                        {form.selectedEmployees.length > 0 && (
-                            <div className="chips-wrap">
-                                {form.selectedEmployees.map(id => {
-                                    const emp = employees.find(
-                                        e => e.emp_id === id
-                                    );
-                                    return (
-                                        <span key={id} className="chip">
-                                            {emp?.emp_name || id}{emp?.emp_department ? ` — ${emp.emp_department}` : ''}
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    toggleEmployee(id)
-                                                }
-                                            >
-                                                ×
-                                            </button>
-                                        </span>
-                                    );
-                                })}
+                        <div className="chips-wrap" style={{ marginTop: 10 }}>
+                            {form.selectedEmployees.map(id => {
+                                const details = selectedEmpDetails[id];
+                                return (
+                                    <span key={id} className="chip">
+                                        {details?.name || id}
+                                        <button type="button" onClick={() => toggleEmployee(id)}>×</button>
+                                    </span>
+                                );
+                            })}
+                        </div>
+
+                        {/* Assign Mode & Team Lead Picker */}
+                        {form.selectedEmployees.length > 1 && (
+                            <div className="assign-mode-card" style={{ marginTop: 15, padding: 15, background: '#f8f9fa', borderRadius: 10, border: '1px solid #eee' }}>
+                                <div style={{ display: 'flex', gap: 15, marginBottom: 15 }}>
+                                    <button
+                                        type="button"
+                                        className={`toggle-btn ${form.assignMode === 'INDIVIDUAL' ? 'toggle-btn-active' : ''}`}
+                                        onClick={() => setField('assignMode', 'INDIVIDUAL')}
+                                        style={{ flex: 1 }}
+                                    >
+                                        Assign Individually
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`toggle-btn ${form.assignMode === 'GROUP' ? 'toggle-btn-active' : ''}`}
+                                        onClick={() => setField('assignMode', 'GROUP')}
+                                        style={{ flex: 1 }}
+                                    >
+                                        Assign as Group 👥
+                                    </button>
+                                </div>
+
+                                {form.assignMode === 'GROUP' && (
+                                    <div className="team-lead-section">
+                                        <label className="form-label">Select Team Lead <span className="req">*</span></label>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+                                            {form.selectedEmployees.map(empId => {
+                                                const emp = selectedEmpDetails[empId];
+                                                if (!emp) return null;
+                                                const isLead = form.teamLeadEmpId === empId;
+                                                return (
+                                                    <label key={empId} className={`team-lead-row ${isLead ? 'lead-active' : ''}`} style={{
+                                                        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                                                        border: '1px solid #ddd', borderRadius: 8, cursor: 'pointer',
+                                                        background: isLead ? '#E3F2FD' : 'white',
+                                                        borderColor: isLead ? '#2196F3' : '#ddd'
+                                                    }}>
+                                                        <input
+                                                            type="radio"
+                                                            name="teamLead"
+                                                            checked={isLead}
+                                                            onChange={() => setField('teamLeadEmpId', empId)}
+                                                        />
+                                                        <span style={{ fontSize: '0.9rem' }}>{emp.name}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                        <p className="field-hint" style={{ marginTop: 8 }}>The Team Lead will have the authority to Start/Complete the task for the entire group.</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

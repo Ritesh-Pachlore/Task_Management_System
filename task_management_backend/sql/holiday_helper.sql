@@ -33,14 +33,14 @@ BEGIN
         ELSE
         BEGIN
             -- Fallback to default Sunday if no record exists for employee
-            IF DATEPART(WEEKDAY, @check_date) = 1 
+            IF DATENAME(WEEKDAY, @check_date) = 'Sunday'
                 RETURN 1;
         END
     END
     ELSE
     BEGIN
         -- Original global logic (e.g. for general task checks)
-        IF DATEPART(WEEKDAY, @check_date) = 1 
+        IF DATENAME(WEEKDAY, @check_date) = 'Sunday'
             RETURN 1;
     END
 

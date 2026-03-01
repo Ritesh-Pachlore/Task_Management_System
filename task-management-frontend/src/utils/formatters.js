@@ -7,6 +7,16 @@ export const formatDate = (dateString) => {
         year: 'numeric',
     });
 };
+export const formatDateWithDay = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
+};
 
 export const formatDateTime = (dateString) => {
     if (!dateString) return '-';

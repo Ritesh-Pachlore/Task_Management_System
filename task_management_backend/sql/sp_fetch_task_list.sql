@@ -1,6 +1,6 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_fetch_task_list]    Script Date: 28-02-2026 17:29:47 ******/
+/****** Object:  StoredProcedure [dbo].[sp_fetch_task_list]    Script Date: 01-03-2026 16:08:07 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -17,7 +17,8 @@ ALTER PROCEDURE [dbo].[sp_fetch_task_list]
     @filter_date_to       DATETIME      = NULL,
     @filter_overdue_only  BIT           = 0,
     @filter_extended_only BIT           = 0,
-    @filter_search        NVARCHAR(255) = NULL
+    @filter_search        NVARCHAR(255) = NULL,
+    @filter_group         NVARCHAR(50)  = NULL -- New: 'PENDING', etc.
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -74,7 +75,7 @@ BEGIN
          WHERE EMP_ID = el.assigned_by) AS assigned_by_name,
 
         -- UPDATED: standardized to el.task_status
-        el.task_status AS status,
+        el.task_status,
         CASE el.task_status
             WHEN 0 THEN 'ASSIGNED'
             WHEN 1 THEN 'STARTED'
@@ -83,7 +84,6 @@ BEGIN
             WHEN 4 THEN 'REJECTED'
             WHEN 5 THEN 'RESUBMITTED'
             WHEN 6 THEN 'CANCELLED'
-            WHEN 7 THEN 'ON HOLD'
         END AS status_name,
 
         el.started_at,
@@ -124,6 +124,22 @@ BEGIN
         rp.weekly_days,
         rp.monthly_day_of_month,
 
+        -- Group Task Info
+        el.group_id,
+        el.is_team_lead,
+        el.is_active,
+        -- Get team lead name for member cards
+        (SELECT TOP 1 s.STF_FRNAME + ' ' + s.STF_LSNAME
+         FROM task_execution_log tl
+         JOIN inout_aems..staffmst s ON s.EMP_ID = tl.emp_id
+         WHERE tl.group_id = el.group_id AND tl.is_team_lead = 1) AS team_lead_name,
+        -- Get all member names for team lead card
+        (SELECT STRING_AGG(s.STF_FRNAME + ' ' + s.STF_LSNAME, ', ')
+         FROM task_execution_log tl
+         JOIN inout_aems..staffmst s ON s.EMP_ID = tl.emp_id
+         WHERE tl.group_id = el.group_id AND tl.emp_id <> el.emp_id
+           AND tl.is_active = 1) AS group_member_names,
+
         @view_type AS view_type
 
     FROM task_details td
@@ -132,11 +148,16 @@ BEGIN
 
     WHERE td.is_active = 1
       AND el.task_status <> 6
+      AND el.is_active = 1
       AND (
             (@view_type = 'SELF' AND el.emp_id = @emp_id)
          OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id)
           )
       AND (@filter_status        IS NULL OR el.task_status        = @filter_status)
+      AND (
+            @filter_group IS NULL 
+            OR (@filter_group = 'PENDING' AND el.task_status IN (0, 4, 5))
+          )
       AND (@filter_priority      IS NULL OR td.priority_type = @filter_priority)
       AND (@filter_task_type     IS NULL OR td.task_type     = @filter_task_type)
       AND (@filter_employee_id   IS NULL OR el.emp_id        = @filter_employee_id)

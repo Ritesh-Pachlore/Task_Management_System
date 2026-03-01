@@ -1,11 +1,11 @@
+# apps/tasks/services.py
+
 """
 Task Services — Business logic layer
 Views call services → services call SPs.
-No auto-shifting. Frontend asks permission first.
 """
-# apps/tasks/services.py
 
-from utils.db_helper import call_sp, call_sp_multiple_results,run_query
+from utils.db_helper import call_sp, call_sp_multiple_results, run_query
 from utils.constants import ActionType, TaskType
 from .notifications import (
     notify_task_assigned,
@@ -17,21 +17,9 @@ from django.core.files.storage import default_storage
 from django.conf import settings
 
 
-def create_task(task_data, created_by, created_by_name="",attachments=None):
+def create_task(task_data, created_by, created_by_name="", attachments=None):
     """
     Create task.
-
-    Date + Time handling:
-    ─────────────────────
-    Frontend sends them separately:
-        task_start_date = "2025-07-15"   (always)
-        start_time      = "09:00"        (only TIME_BOUND)
-        task_end_date   = "2025-07-15"   (TIME_BOUND + others)
-        end_time        = "09:30"        (only TIME_BOUND)
-
-    SP combines them:
-        TIME_BOUND → 2025-07-15 09:00:00
-        Others     → 2025-07-15 00:00:00
     """
     required = [
         'task_title',
@@ -56,15 +44,14 @@ def create_task(task_data, created_by, created_by_name="",attachments=None):
     monthly_day_of_month = 0
 
     if task_type in [TaskType.DAILY, TaskType.WEEKLY, TaskType.MONTHLY]:
-        # recurrence_type now maps to numeric IDs: 1(Daily), 2(Weekly), 3(Monthly)
         recurrence_type = task_data.get('recurrence_type')
         if not recurrence_type:
             recurrence_type = str(task_type)
-            
+
         recurrence_end_date = task_data.get('recurrence_end_date')
         if not recurrence_end_date or recurrence_end_date == '':
             recurrence_end_date = '3000-12-31'
-        
+
         if task_type == TaskType.DAILY:
             weekly_days = '0'
             monthly_day_of_month = 0
@@ -76,7 +63,6 @@ def create_task(task_data, created_by, created_by_name="",attachments=None):
             monthly_day_of_month = 0
         elif task_type == TaskType.MONTHLY:
             weekly_days = '0'
-            # Derive from start_date if not explicitly provided
             monthly_day_of_month = task_data.get('monthly_day_of_month')
             if not monthly_day_of_month and task_data.get('task_start_date'):
                 try:
@@ -87,53 +73,47 @@ def create_task(task_data, created_by, created_by_name="",attachments=None):
                     monthly_day_of_month = 0
             monthly_day_of_month = monthly_day_of_month or 0
 
-    # ── Default end date for non-recurrent (Random/Time) ────────
+    # ── Default end date ────────────────────────────────────────
     if not task_data.get('task_end_date'):
         task_data['task_end_date'] = task_data.get('task_start_date')
 
-    # ── Extract time fields (only meaningful for TIME_BOUND) ─────
+    # ── Extract time fields (only for TIME_BOUND) ───────────────
     if task_type == TaskType.TIME_BOUND:
         start_time = task_data.get('start_time') or None
-        end_time   = task_data.get('end_time')   or None
+        end_time = task_data.get('end_time') or None
     else:
         start_time = None
-        end_time   = None
+        end_time = None
 
     result = call_sp('sp_create_task', [
         task_data['task_title'],
         task_data.get('task_description', ''),
         task_type,
         int(task_data['priority_type']),
-        task_data['task_start_date'],    # DATE string 
-        start_time,                      # TIME string or None
-        task_data['task_end_date'],      # DATE string
-        end_time,                        # TIME string or None
+        task_data['task_start_date'],
+        start_time,
+        task_data['task_end_date'],
+        end_time,
         created_by,
         task_data['emp_list'],
-        # New Recurrence params
         recurrence_type,
         recurrence_end_date,
         weekly_days,
         monthly_day_of_month,
+        task_data.get('assign_mode', 'INDIVIDUAL'),
+        task_data.get('team_lead_emp_id', None),
     ])
 
     if result and result[0].get('success') == 1:
-
-                # 🔥 GET CREATED TASK ID FROM SP RESULT
         task_id = result[0].get('task_id')
-
-        # 🔥 SAVE ATTACHMENTS IF PRESENT
-        # attachments = task_data.get('attachments')
 
         if attachments and task_id:
             with connection.cursor() as cursor:
                 for file in attachments:
-                    
                     file_path = default_storage.save(
                         f"task_attachments/{file.name}",
                         file
                     )
-
                     cursor.execute("""
                         INSERT INTO task_attachments
                         (task_id, file_name, file_path)
@@ -152,13 +132,7 @@ def create_task(task_data, created_by, created_by_name="",attachments=None):
     return result
 
 
-from django.conf import settings
-from django.db import connection
-
-
 def get_tasks(emp_id, view_type, filters=None):
-
-    # 🔹 Step 1: Call SP and store result
     if filters:
         tasks = call_sp('sp_fetch_task_list', [
             emp_id,
@@ -172,30 +146,28 @@ def get_tasks(emp_id, view_type, filters=None):
             1 if filters.get('overdue_only') else 0,
             1 if filters.get('extended_only') else 0,
             filters.get('search'),
+            filters.get('filter_group'),
         ])
     else:
         tasks = call_sp('sp_fetch_task_list', [
             emp_id, view_type,
-            None, None, None, None, None, None, 0, 0, None,
+            None, None, None, None, None, None, 0, 0, None, None
         ])
 
-    # 🔹 Step 2: Attach files to each task
+    # Attach files to each task
     if tasks:
         with connection.cursor() as cursor:
             for task in tasks:
-
                 task_id = task.get("task_id")
                 execution_log_id = task.get("execution_log_id")
-
                 all_attachments = []
 
-                # Get manager's initial attachments
+                # Manager's initial attachments
                 cursor.execute("""
                     SELECT file_name, file_path
                     FROM task_attachments
                     WHERE task_id = %s
                 """, [task_id])
-
                 rows = cursor.fetchall()
                 for row in rows:
                     all_attachments.append({
@@ -204,15 +176,15 @@ def get_tasks(emp_id, view_type, filters=None):
                         "uploaded_by": "Manager"
                     })
 
-                # Get employee's submitted attachments
+                # Employee's submitted attachments
                 if execution_log_id:
                     cursor.execute("""
-                        SELECT ta.file_name, ta.file_path, s.STF_FRNAME + ' ' + s.STF_LSNAME AS emp_name
+                        SELECT ta.file_name, ta.file_path,
+                               s.STF_FRNAME + ' ' + s.STF_LSNAME AS emp_name
                         FROM task_execution_attachments ta
                         LEFT JOIN inout_aems..staffmst s ON s.EMP_ID = ta.uploaded_by
                         WHERE ta.execution_log_id = %s
                     """, [execution_log_id])
-                    
                     exec_rows = cursor.fetchall()
                     for row in exec_rows:
                         all_attachments.append({
@@ -224,7 +196,6 @@ def get_tasks(emp_id, view_type, filters=None):
 
                 task["attachments"] = all_attachments
 
-    # 🔹 Step 3: Return modified result
     return tasks
 
 
@@ -234,11 +205,10 @@ def update_task_status(execution_log_id, action_type,
         execution_log_id, action_type, action_by, remarks, None,
     ])
     if result and result[0].get('success') == 1:
-        info        = result[0]
+        info = result[0]
         status_name = ActionType.CHOICES.get(action_type, 'UNKNOWN')
-        task_id     = info.get('task_id')
-        
-        # 🔥 SAVE ATTACHMENTS IF PRESENT TO THE NEW TABLE
+
+        # Save attachments if present
         if attachments and execution_log_id:
             with connection.cursor() as cursor:
                 for file in attachments:
@@ -251,7 +221,7 @@ def update_task_status(execution_log_id, action_type,
                         (execution_log_id, file_name, file_path, uploaded_by)
                         VALUES (%s, %s, %s, %s)
                     """, [execution_log_id, file.name, file_path, action_by])
-                    
+
         if action_type in [1, 2, 5]:
             notify_status_changed(
                 info.get('assigned_by'), remarks,
@@ -262,6 +232,24 @@ def update_task_status(execution_log_id, action_type,
                 info.get('emp_id'), remarks,
                 status_name, action_by_name,
             )
+    return result
+
+
+def edit_task(execution_log_id, title, description,
+              emp_list=None, deadline=None, team_lead_emp_id=None):
+    """Edit task — calls sp_edit_task with team lead support."""
+    if not execution_log_id or not title or not description:
+        return [{"success": 0,
+                 "message": "execution_log_id, title, and description are required"}]
+
+    result = call_sp('sp_edit_task', [
+        execution_log_id,
+        title,
+        description,
+        emp_list,
+        deadline,
+        team_lead_emp_id,  # NEW: 6th parameter
+    ])
     return result
 
 
@@ -294,7 +282,6 @@ def get_dashboard_counts(emp_id, view_type, date_from=None, date_to=None, employ
     overall = results[0][0] if len(results) > 0 and results[0] else {}
     employee_summary = results[1] if len(results) > 1 and results[1] else []
 
-    # Enrich employee_summary: if department is missing or 'N/A', try a direct lookup
     if employee_summary:
         for emp in employee_summary:
             dep = emp.get('emp_department') if emp else None
@@ -312,22 +299,20 @@ def get_dashboard_counts(emp_id, view_type, date_from=None, date_to=None, employ
                     else:
                         emp['emp_department'] = None
                 except Exception:
-                    # best-effort: leave as-is if lookup fails
                     pass
 
     return {
-        "view_type":        view_type,
-        "overall_counts":   overall,
+        "view_type": view_type,
+        "overall_counts": overall,
         "employee_summary": employee_summary,
-        "status_chart":     results[2]    if len(results) > 2 and results[2] else [],
-        "priority_chart":   results[3]    if len(results) > 3 and results[3] else [],
-        "monthly_trend":    results[4]    if len(results) > 4 and results[4] else [],
+        "status_chart": results[2] if len(results) > 2 and results[2] else [],
+        "priority_chart": results[3] if len(results) > 3 and results[3] else [],
+        "monthly_trend": results[4] if len(results) > 4 and results[4] else [],
     }
 
 
 def get_affected_tasks(emp_id, view_type):
-    return call_sp('sp_get_affected_tasks', [emp_id, view_type]) 
-
+    return call_sp('sp_get_affected_tasks', [emp_id, view_type])
 
 
 def get_employees(emp_id, search=None):
@@ -341,9 +326,7 @@ def get_employees(emp_id, search=None):
         WHERE
             s.REP_STATUS = 1
     """
-
     params = []
-
     if search:
         query += """
             AND (
@@ -353,7 +336,5 @@ def get_employees(emp_id, search=None):
             )
         """
         params = [f'%{search}%', f'%{search}%', f'%{search}%']
-
     query += " ORDER BY s.STF_FRNAME, s.STF_LSNAME"
-
     return run_query(query, params)

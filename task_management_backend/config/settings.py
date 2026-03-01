@@ -36,7 +36,7 @@ INSTALLED_APPS = [
     'corsheaders',             # CORS for React
     'apps.authentication',     # Our auth app
     'apps.tasks',              # Our tasks app
-    # 'django_apscheduler',      # Scheduler — tables fixed via fix_apscheduler_tables.sql
+    'django_apscheduler',      # Scheduler — tables fixed via fix_apscheduler_tables.sql
 ]
 
 

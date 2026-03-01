@@ -1,12 +1,13 @@
 // src/pages/AffectedTasksPage.jsx
 // CHANGE: Add useCallback import, wrap fetchAffected with useCallback
 
-import React, { useState, useEffect, useCallback } from 'react';  // ← add useCallback
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
 import PriorityBadge from '../components/common/PriorityBadge';
 import StatusBadge from '../components/common/StatusBadge';
-import { formatDate } from '../utils/formatters';
+import { STATUS_MAP, PRIORITY_MAP } from '../utils/constants';
+import { formatDate, formatDateWithDay } from '../utils/formatters';
 import { MdWarning } from 'react-icons/md';
 
 const AffectedTasksPage = () => {
@@ -102,7 +103,7 @@ const AffectedTasksPage = () => {
                             }}>
                                 <div style={{ display: 'flex', gap: 8 }}>
                                     <PriorityBadge priority={task.priority_type} />
-                                    <StatusBadge status={task.status} />
+                                    <StatusBadge status={task.task_status !== undefined ? task.task_status : task.status} />
                                 </div>
                                 <span style={{
                                     fontSize: 12,
@@ -128,14 +129,14 @@ const AffectedTasksPage = () => {
                                 <p>
                                     📅 Current:{' '}
                                     <strong>
-                                        {formatDate(task.current_deadline)}
+                                        {formatDateWithDay(task.current_deadline)}
                                     </strong>
                                     {' '}({task.reason})
                                 </p>
                                 <p>
                                     💡 Suggested:{' '}
                                     <strong>
-                                        {formatDate(task.suggested_date)}
+                                        {formatDateWithDay(task.suggested_date)}
                                     </strong>
                                 </p>
                                 {task.days_until_deadline !== null && (
