@@ -1,6 +1,6 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_dashboard_counts]    Script Date: 28-02-2026 17:28:59 ******/
+/****** Object:  StoredProcedure [dbo].[sp_dashboard_counts]    Script Date: 02-03-2026 11:12:52 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -33,14 +33,20 @@ BEGIN
                  AND el.task_status NOT IN (3, 6) THEN 1 ELSE 0 END) AS overdue_count,
         SUM(CASE WHEN el.task_status NOT IN (3, 6)
                  AND COALESCE(el.extended_date, td.task_end_date) >= GETDATE()
-                 AND dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE)) = 1
+                 AND dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE), el.emp_id) = 1
                  THEN 1 ELSE 0 END) AS holiday_affected_count
     FROM task_execution_log el
     INNER JOIN task_details td ON el.task_id = td.task_id
     WHERE td.is_active = 1
+      AND el.is_active = 1 -- ADDED: Filter inactive assignments
       AND el.task_status <> 6
       AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)
            OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id))
+      -- DE-DUPLICATE GROUP TASKS FOR MANAGER VIEW (Count as 1 if no employee filter)
+      AND (@view_type <> 'ASSIGNED_BY_ME' OR @employee_id IS NOT NULL OR el.group_id IS NULL OR el.is_team_lead = 1
+           OR (el.id = (SELECT MIN(el2.id) FROM task_execution_log el2 WHERE el2.task_id = el.task_id AND el2.group_id = el.group_id AND el2.is_active = 1)
+               AND NOT EXISTS (SELECT 1 FROM task_execution_log el3 WHERE el3.task_id = el.task_id AND el3.group_id = el.group_id AND el3.is_team_lead = 1 AND el3.is_active = 1))
+          )
       AND (@date_from IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to   IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id);
@@ -72,7 +78,10 @@ BEGIN
 
         FROM task_execution_log el
         INNER JOIN task_details td ON el.task_id = td.task_id
-        WHERE el.assigned_by = @emp_id AND td.is_active = 1 AND el.task_status <> 6
+        WHERE el.assigned_by = @emp_id 
+          AND td.is_active = 1 
+          AND el.is_active = 1 -- ADDED: Filter inactive assignments
+          AND el.task_status <> 6
           AND (@date_from    IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
           AND (@date_to      IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
           AND (@employee_id  IS NULL OR el.emp_id = @employee_id)
@@ -109,6 +118,11 @@ BEGIN
     WHERE td.is_active = 1 AND el.task_status <> 6
       AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)
            OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id))
+      -- DE-DUPLICATE GROUP TASKS FOR MANAGER VIEW
+      AND (@view_type <> 'ASSIGNED_BY_ME' OR @employee_id IS NOT NULL OR el.group_id IS NULL OR el.is_team_lead = 1
+           OR (el.id = (SELECT MIN(el2.id) FROM task_execution_log el2 WHERE el2.task_id = el.task_id AND el2.group_id = el.group_id AND el2.is_active = 1)
+               AND NOT EXISTS (SELECT 1 FROM task_execution_log el3 WHERE el3.task_id = el.task_id AND el3.group_id = el.group_id AND el3.is_team_lead = 1 AND el3.is_active = 1))
+          )
       AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)
@@ -134,6 +148,11 @@ BEGIN
     WHERE td.is_active = 1 AND el.task_status <> 6
       AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)
            OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id))
+      -- DE-DUPLICATE GROUP TASKS FOR MANAGER VIEW
+      AND (@view_type <> 'ASSIGNED_BY_ME' OR @employee_id IS NOT NULL OR el.group_id IS NULL OR el.is_team_lead = 1
+           OR (el.id = (SELECT MIN(el2.id) FROM task_execution_log el2 WHERE el2.task_id = el.task_id AND el2.group_id = el.group_id AND el2.is_active = 1)
+               AND NOT EXISTS (SELECT 1 FROM task_execution_log el3 WHERE el3.task_id = el.task_id AND el3.group_id = el.group_id AND el3.is_team_lead = 1 AND el3.is_active = 1))
+          )
       AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)
@@ -162,6 +181,11 @@ BEGIN
     WHERE td.is_active = 1 AND el.task_status <> 6
       AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)
            OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id))
+      -- DE-DUPLICATE GROUP TASKS FOR MANAGER VIEW
+      AND (@view_type <> 'ASSIGNED_BY_ME' OR @employee_id IS NOT NULL OR el.group_id IS NULL OR el.is_team_lead = 1
+           OR (el.id = (SELECT MIN(el2.id) FROM task_execution_log el2 WHERE el2.task_id = el.task_id AND el2.group_id = el.group_id AND el2.is_active = 1)
+               AND NOT EXISTS (SELECT 1 FROM task_execution_log el3 WHERE el3.task_id = el.task_id AND el3.group_id = el.group_id AND el3.is_team_lead = 1 AND el3.is_active = 1))
+          )
       AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
       AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)

@@ -1,6 +1,6 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_fetch_task_list]    Script Date: 01-03-2026 16:08:07 ******/
+/****** Object:  StoredProcedure [dbo].[sp_fetch_task_list]    Script Date: 02-03-2026 11:13:25 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -128,7 +128,10 @@ BEGIN
         el.group_id,
         el.is_team_lead,
         el.is_active,
-        -- Get team lead name for member cards
+        -- Get team lead ID and name for group tasks
+        (SELECT TOP 1 tl.emp_id
+         FROM task_execution_log tl
+         WHERE tl.group_id = el.group_id AND tl.is_team_lead = 1) AS team_lead_emp_id,
         (SELECT TOP 1 s.STF_FRNAME + ' ' + s.STF_LSNAME
          FROM task_execution_log tl
          JOIN inout_aems..staffmst s ON s.EMP_ID = tl.emp_id
@@ -176,5 +179,10 @@ BEGIN
                WHERE EMP_ID = el.emp_id)
               LIKE '%' + @filter_search + '%')
 
-    ORDER BY el.updated_at DESC;
+    ORDER BY 
+        CASE 
+            WHEN @view_type = 'ASSIGNED_BY_ME' AND el.task_status IN (2, 5) THEN 0 
+            ELSE 1 
+        END,
+        el.updated_at DESC;
 END

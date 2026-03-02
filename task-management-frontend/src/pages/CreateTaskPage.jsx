@@ -15,7 +15,7 @@ const TASK_TYPES = [
     { value: 1, label: 'Daily' },
     { value: 2, label: 'Weekly' },
     { value: 3, label: 'Monthly' },
-    { value: 4, label: 'Random' },
+    { value: 4, label: 'One Day' },
     { value: 5, label: 'Time Bound' },
 ];
 
@@ -419,6 +419,7 @@ const CreateTaskPage = () => {
                         )}
                     </div>
 
+                 
 
                     {/* ══════════════════════════════════════════
                         SECTION 2: Task Type toggle buttons
@@ -439,26 +440,6 @@ const CreateTaskPage = () => {
                         </div>
                     </div>
 
-                    {/* Priority */}
-                    <div className="form-group">
-                        <label className="form-label">Priority <span className="req">*</span></label>
-                        <div className="toggle-group">
-                            {PRIORITIES.map(p => {
-                                const active = form.priority_type === p.value;
-                                return (
-                                    <button
-                                        key={p.value}
-                                        type="button"
-                                        className={`toggle-btn ${active ? 'priority-btn-active' : ''}`}
-                                        style={active ? { background: p.color, borderColor: p.color, color: 'white' } : { borderColor: p.color, color: p.color, background: p.bg }}
-                                        onClick={() => setField('priority_type', p.value)}
-                                    >
-                                        {p.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
 
                     {/* Conditionals */}
 
@@ -530,6 +511,29 @@ const CreateTaskPage = () => {
                             </div>
                         </div>
                     )}
+
+
+                    {/* Priority */}
+                    <div className="form-group">
+                        <label className="form-label">Priority <span className="req">*</span></label>
+                        <div className="toggle-group">
+                            {PRIORITIES.map(p => {
+                                const active = form.priority_type === p.value;
+                                return (
+                                    <button
+                                        key={p.value}
+                                        type="button"
+                                        className={`toggle-btn ${active ? 'priority-btn-active' : ''}`}
+                                        style={active ? { background: p.color, borderColor: p.color, color: 'white' } : { borderColor: p.color, color: p.color, background: p.bg }}
+                                        onClick={() => setField('priority_type', p.value)}
+                                    >
+                                        {p.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
 
                     {/* Assign To */}
                     <div className="form-group" ref={dropdownRef} style={{ marginTop: 25 }}>

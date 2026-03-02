@@ -41,10 +41,15 @@ const ActionModal = ({ title, onSubmit, onClose, showDate = false, actionModal }
             // NEW: Initialize team lead info
             const groupId = task.group_id;
             const teamLeadEmpId = task.team_lead_emp_id;
-            if (groupId && teamLeadEmpId) {
+            if (groupId) {
                 setIsGroupTask(true);
-                setCurrentTeamLeadId(teamLeadEmpId);
-                setNewTeamLeadId(teamLeadEmpId);
+                setCurrentTeamLeadId(teamLeadEmpId || null);
+                setNewTeamLeadId(teamLeadEmpId || null);
+
+                // If there's a group but no lead, prompt immediately
+                if (!teamLeadEmpId) {
+                    setShowTeamLeadPrompt(true);
+                }
             } else {
                 setIsGroupTask(false);
                 setCurrentTeamLeadId(null);

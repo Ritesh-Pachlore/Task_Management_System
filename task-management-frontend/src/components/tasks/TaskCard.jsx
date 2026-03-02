@@ -1,5 +1,6 @@
 // src/components/tasks/TaskCard.jsx
 import React from 'react';
+import api, { API_BASE_URL } from '../../api/axios';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../common/StatusBadge';
 import PriorityBadge from '../common/PriorityBadge';
@@ -55,12 +56,19 @@ const TaskCard = ({ task, viewType, onAction }) => {
         const actions = [];
 
         if (viewType === 'SELF') {
-            if (status === 0 && !isFutureStart) {
-                actions.push({ type: 1, label: 'Start', cls: 'btn-primary' });
+            const isGroup = !!task.group_id;
+            // Use Number() for robustness against string/int types from backend
+            const isLead = Number(task.is_team_lead) === 1;
+
+            // Only Lead or Individual Task can take actions
+            if (!isGroup || isLead) {
+                if (status === 0 && !isFutureStart) {
+                    actions.push({ type: 1, label: 'Start', cls: 'btn-primary' });
+                }
+                if (status === 1) actions.push({ type: 2, label: 'Submit', cls: 'btn-success' });
+                if (status === 4) actions.push({ type: 5, label: 'Resubmit', cls: 'btn-warning' });
+                if (status === 7) actions.push({ type: 1, label: 'Resume', cls: 'btn-primary' });
             }
-            if (status === 1) actions.push({ type: 2, label: 'Submit', cls: 'btn-success' });
-            if (status === 4) actions.push({ type: 5, label: 'Resubmit', cls: 'btn-warning' });
-            if (status === 7) actions.push({ type: 1, label: 'Resume', cls: 'btn-primary' });
         }
 
         if (viewType === 'ASSIGNED_BY_ME') {
@@ -85,7 +93,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
 
     return (
         <div
-            className={`task-card ${isOverdue ? 'task-card-overdue' : ''}`}
+            className={`task - card ${isOverdue ? 'task-card-overdue' : ''} `}
         >
             <div className="task-card-top">
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -93,6 +101,25 @@ const TaskCard = ({ task, viewType, onAction }) => {
                         <PriorityBadge priority={task.priority_type} />
                         <StatusBadge status={status} />
                         {task.extended_date && <span className="task-extended-tag">Extended</span>}
+                        {task.group_id && (
+                            <span className={`task - group - badge ${task.is_team_lead ? 'lead' : 'member'} `} style={{
+                                fontSize: '12px',
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontWeight: '700',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: task.is_team_lead ? '#e3f2fd' : '#f8f9fa',
+                                color: task.is_team_lead ? '#0d47a1' : '#616161',
+                                border: `1px solid ${task.is_team_lead ? '#90caf9' : '#eeeeee'} `,
+                                boxShadow: task.is_team_lead ? '0 2px 4px rgba(13, 71, 161, 0.1)' : 'none',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.3px'
+                            }}>
+                                {task.is_team_lead ? '⭐' : '👥'} Lead: {task.team_lead_name || 'N/A'}
+                            </span>
+                        )}
                     </div>
                     <div style={{ marginTop: 6, fontSize: 12, color: '#666' }}>
                         {PRIORITY_MAP[task.priority_type]?.name || ''}{', '}{STATUS_MAP[status]?.name || ''}
@@ -115,6 +142,33 @@ const TaskCard = ({ task, viewType, onAction }) => {
             {task.task_description && (
                 <p className="task-card-desc">{task.task_description}</p>
             )}
+
+            {/* Group Members Section */}
+            {task.group_id && task.emp_names && (
+                <div style={{
+                    marginTop: '12px',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: '8px'
+                }}>
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#555' }}>members:-</span>
+                    {task.emp_names.split(',').map((name, index) => (
+                        <span key={index} style={{
+                            padding: '4px 10px',
+                            background: 'rgba(67, 97, 238, 0.05)',
+                            border: '1px solid #4361ee',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            color: '#4361ee',
+                            fontWeight: '500',
+                            whiteSpace: 'nowrap'
+                        }}>
+                            {name.trim()}
+                        </span>
+                    ))}
+                </div>
+            )}
             {/* Attachments Section */}
             {task.attachments && task.attachments.length > 0 && (() => {
                 const managerFiles = task.attachments.filter(f => !f.is_employee_upload);
@@ -128,7 +182,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                                 {managerFiles.map((file, index) => (
                                     <div key={index} style={{ marginTop: 4 }}>
                                         <a
-                                            href={`http://localhost:8001${file.file_url}`}
+                                            href={`${API_BASE_URL}${file.file_url} `}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             style={{ fontSize: 13, color: '#007bff' }}
@@ -147,7 +201,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                                 {employeeFiles.map((file, index) => (
                                     <div key={index} style={{ marginTop: 4 }}>
                                         <a
-                                            href={`http://localhost:8001${file.file_url}`}
+                                            href={`${API_BASE_URL}${file.file_url} `}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             style={{ fontSize: 13, color: '#28a745' }}
@@ -168,8 +222,8 @@ const TaskCard = ({ task, viewType, onAction }) => {
                     <MdPerson />
                     <span>
                         {viewType === 'SELF'
-                            ? `By: ${task.assigned_by_name || 'Unknown'}`
-                            : `To: ${task.emp_name || 'Unknown'}`
+                            ? `By: ${task.assigned_by_name || 'Unknown'} `
+                            : `To: ${task.emp_name || 'Unknown'} `
                         }
                     </span>
                 </div>
@@ -177,11 +231,11 @@ const TaskCard = ({ task, viewType, onAction }) => {
                     <MdAccessTime />
                     <span>
                         {task.task_type === 1
-                            ? `Daily Task${!isInfinite ? ' | Due: ' + formatDate(task.effective_deadline) : ''}`
+                            ? `Daily Task${!isInfinite ? ' | Due: ' + formatDate(task.effective_deadline) : ''} `
                             : task.task_type === 2
-                                ? `Weekly task on ${task.weekly_days || 'N/A'}${(!isInfinite && task.effective_deadline) ? ' | Due: ' + formatDate(task.effective_deadline) : ''}`
+                                ? `Weekly task on ${task.weekly_days || 'N/A'}${(!isInfinite && task.effective_deadline) ? ' | Due: ' + formatDate(task.effective_deadline) : ''} `
                                 : task.task_type === 3
-                                    ? `Monthly task on ${task.monthly_day_of_month ? task.monthly_day_of_month + getSuffix(task.monthly_day_of_month) : 'N/A'}${(!isInfinite && task.effective_deadline) ? ' | Due: ' + formatDate(task.effective_deadline) : ''}`
+                                    ? `Monthly task on ${task.monthly_day_of_month ? task.monthly_day_of_month + getSuffix(task.monthly_day_of_month) : 'N/A'}${(!isInfinite && task.effective_deadline) ? ' | Due: ' + formatDate(task.effective_deadline) : ''} `
                                     : formatDate(task.effective_deadline)
                         }
                         {/* // Display "Starts in X days" */}
@@ -204,7 +258,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                     {otherActions.map((action, idx) => (
                         <button
                             key={idx}
-                            className={`btn btn-sm ${action.cls}`}
+                            className={`btn btn - sm ${action.cls} `}
                             onClick={(e) => { e.stopPropagation(); onAction(task, action.type); }}
                         >
                             {action.label}
@@ -216,7 +270,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                         className="btn btn-sm btn-outline"
                         onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/task/${task.execution_log_id}`);
+                            navigate(`/ task / ${task.execution_log_id} `);
                         }}
                     >
                         <MdHistory /> History

@@ -1,6 +1,6 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_edit_task]    Script Date: 01-03-2026 15:56:58 ******/
+/****** Object:  StoredProcedure [dbo].[sp_edit_task]    Script Date: 02-03-2026 11:13:07 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -10,7 +10,8 @@ ALTER PROCEDURE [dbo].[sp_edit_task]
     @title NVARCHAR(255),
     @description NVARCHAR(MAX),
     @emp_list NVARCHAR(MAX) = NULL,
-    @deadline DATETIME = NULL
+    @deadline DATETIME = NULL,
+    @team_lead_emp_id BIGINT = NULL -- NEW: 6th parameter
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -67,9 +68,10 @@ BEGIN
                 WHERE TRIM(value) <> '';
             END
 
-            -- Set is_active = 0 for employees removed from the task
+            -- Set is_active = 0 AND is_team_lead = 0 for employees removed from the task
             UPDATE dbo.task_execution_log
             SET is_active = 0,
+                is_team_lead = 0, -- Ensure they are no longer lead if removed
                 updated_at = GETDATE()
             WHERE task_id = @task_id
               AND emp_id NOT IN (SELECT emp_id FROM @emp_table)
@@ -88,13 +90,29 @@ BEGIN
             SELECT @manager_id = assigned_by FROM dbo.task_execution_log WHERE id = @execution_log_id;
 
             -- Insert brand new employees into task_execution_log
-            INSERT INTO dbo.task_execution_log (task_id, emp_id, assigned_by, task_status, is_active)
-            SELECT @task_id, e.emp_id, @manager_id, 0, 1
+            INSERT INTO dbo.task_execution_log (task_id, emp_id, assigned_by, task_status, is_active, is_team_lead)
+            SELECT @task_id, e.emp_id, @manager_id, 0, 1, 0
             FROM @emp_table e
             WHERE NOT EXISTS (
                 SELECT 1 FROM dbo.task_execution_log t 
                 WHERE t.task_id = @task_id AND t.emp_id = e.emp_id
             );
+        END
+
+        -- ✅ Handle Team Lead reassignment
+        IF @team_lead_emp_id IS NOT NULL
+        BEGIN
+            -- Reset all leads for this task
+            UPDATE dbo.task_execution_log
+            SET is_team_lead = 0
+            WHERE task_id = @task_id;
+
+            -- Set new lead
+            UPDATE dbo.task_execution_log
+            SET is_team_lead = 1,
+                is_active = 1 -- Ensure lead is active
+            WHERE task_id = @task_id 
+              AND emp_id = @team_lead_emp_id;
         END
 
         COMMIT TRANSACTION;

@@ -94,8 +94,13 @@
     gap: 0;
 }
 
-.priority-btn .toggle-desc { display: none; }
-.priority-btn .toggle-icon { display: none; }
+.priority-btn .toggle-desc {
+    display: none;
+}
+
+.priority-btn .toggle-icon {
+    display: none;
+}
 
 .toggle-btn-future {
     opacity: 0.4;
@@ -167,6 +172,7 @@
 }
 
 @media (max-width: 540px) {
+
     .datetime-row,
     .two-col {
         grid-template-columns: 1fr;
@@ -201,6 +207,7 @@
     left: 11px;
     font-size: 14px;
     pointer-events: none;
+    -webkit-user-select: none;
     user-select: none;
 }
 
@@ -233,7 +240,10 @@
     display: flex;
     align-items: center;
 }
-.search-clear:hover { color: #555; }
+
+.search-clear:hover {
+    color: #555;
+}
 
 .emp-list-box {
     border: 1px solid #e8ecf1;
@@ -264,9 +274,17 @@
     font-size: 13px;
 }
 
-.emp-row:last-child { border-bottom: none; }
-.emp-row:hover { background: #f0f3ff; }
-.emp-row-checked { background: #ebefff; }
+.emp-row:last-child {
+    border-bottom: none;
+}
+
+.emp-row:hover {
+    background: #f0f3ff;
+}
+
+.emp-row-checked {
+    background: #ebefff;
+}
 
 .emp-row input[type="checkbox"] {
     accent-color: #4361ee;
@@ -333,6 +351,7 @@
     border-radius: 50%;
     transition: background 0.12s, color 0.12s;
 }
+
 .chip button:hover {
     background: #c5d0f8;
     color: #e53935;

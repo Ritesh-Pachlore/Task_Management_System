@@ -231,8 +231,20 @@ class DashboardView(APIView):
             view_type = request.query_params.get('view', 'SELF')
             if view_type not in ['SELF', 'ASSIGNED_BY_ME']:
                 view_type = 'SELF'
+
+            date_from = request.query_params.get('date_from') or None
+            date_to = request.query_params.get('date_to') or None
+            employee_id = request.query_params.get('employee_id')
+            if employee_id:
+                employee_id = int(employee_id)
+
             result = services.get_dashboard_counts(
-                request.user.emp_id, view_type)
+                request.user.emp_id,
+                view_type,
+                date_from=date_from,
+                date_to=date_to,
+                employee_id=employee_id
+            )
             return success_response(data=result)
         except Exception as e:
             return error_response(message=str(e))

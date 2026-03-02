@@ -1,6 +1,6 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_update_task_status]    Script Date: 28-02-2026 17:31:23 ******/
+/****** Object:  StoredProcedure [dbo].[sp_update_task_status]    Script Date: 02-03-2026 11:15:32 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -47,14 +47,13 @@ BEGIN
         -- Map action to new status
         SET @new_status =
             CASE @action_type
-                WHEN 1 THEN 1   -- STARTED (or RESUMED)
+                WHEN 1 THEN 1   -- STARTED
                 WHEN 2 THEN 2   -- SUBMITTED
-                WHEN 3 THEN 3   -- COMPLETED (APPROVED)
+                WHEN 3 THEN 3   -- COMPLETED
                 WHEN 4 THEN 4   -- REJECTED
                 WHEN 5 THEN 5   -- RESUBMITTED
                 WHEN 6 THEN 6   -- CANCELLED
                 WHEN 7 THEN @current_status -- EXTENDED (no status change)
-                WHEN 8 THEN 7   -- ON_HOLD
                 ELSE -1
             END;
 
@@ -138,7 +137,58 @@ END
             WHERE task_id = @task_id;
         END
 
-        -- Insert history with smart default remarks
+        -- ─────────────────────────────────────────────
+        -- NEW: Group Synchronization Logic
+        -- ─────────────────────────────────────────────
+        DECLARE @group_id_val BIGINT;
+        DECLARE @is_team_lead_val BIT;
+
+        SELECT @group_id_val = group_id, @is_team_lead_val = is_team_lead 
+        FROM task_execution_log WHERE id = @execution_log_id;
+
+        IF @group_id_val IS NOT NULL
+        BEGIN
+            -- Sync if: 
+            -- 1. Action is by a Manager (Status 3, 4, 6, 7 often manager actions)
+            -- 2. Action is by Team Lead (Start/Submit/Resubmit)
+            DECLARE @should_sync BIT = 0;
+            IF @is_team_lead_val = 1 SET @should_sync = 1;
+            IF @action_by = @assigned_by SET @should_sync = 1;
+
+            IF @should_sync = 1
+            BEGIN
+                -- Sync status to all other active group members
+                UPDATE task_execution_log
+                SET task_status = @new_status,
+                    started_at = CASE WHEN @action_type = 1 AND started_at IS NULL THEN @now ELSE started_at END,
+                    extended_date = CASE WHEN @action_type = 7 THEN @extended_date ELSE extended_date END,
+                    rejection_count = CASE WHEN @action_type = 4 THEN rejection_count + 1 ELSE rejection_count END,
+                    updated_at = @now
+                WHERE group_id = @group_id_val
+                  AND id <> @execution_log_id
+                  AND is_active = 1;
+
+                -- Insert history for each member
+                INSERT INTO task_execution_history (execution_log_id, action_type, action_by, remarks, action_at)
+                SELECT id,
+                    @action_type,
+                    @action_by,
+                    'Group Sync: ' + 
+                    CASE 
+                        WHEN @action_type = 7 THEN 'Deadline extended to ' + CONVERT(VARCHAR(19), @extended_date, 120)
+                        WHEN @is_team_lead_val = 1 THEN 'Synced from Team Lead'
+                        ELSE 'Synced from Manager Action'
+                    END + 
+                    CASE WHEN @remarks IS NOT NULL AND @remarks <> '' THEN ' (' + @remarks + ')' ELSE '' END,
+                    @now
+                FROM task_execution_log
+                WHERE group_id = @group_id_val
+                  AND id <> @execution_log_id
+                  AND is_active = 1;
+            END
+        END
+
+        -- Insert history with smart default remarks for the primary row
         INSERT INTO task_execution_history (
             execution_log_id,
             action_type,

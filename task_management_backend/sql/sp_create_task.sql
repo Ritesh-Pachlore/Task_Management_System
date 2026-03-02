@@ -1,6 +1,6 @@
 USE [DButilities]
 GO
-/****** Object:  StoredProcedure [dbo].[sp_create_task]    Script Date: 28-02-2026 17:27:58 ******/
+/****** Object:  StoredProcedure [dbo].[sp_create_task]    Script Date: 02-03-2026 11:12:32 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -22,7 +22,11 @@ ALTER PROCEDURE [dbo].[sp_create_task]
     @recurrence_type       VARCHAR(10)  = NULL,
     @recurrence_end_date   DATE         = NULL,
     @weekly_days           VARCHAR(100) = NULL,
-    @monthly_day_of_month  INT          = NULL
+    @monthly_day_of_month  INT          = NULL,
+
+    -- Group Task parameters
+    @assign_mode           NVARCHAR(10) = 'INDIVIDUAL', -- 'GROUP' or 'INDIVIDUAL'
+    @team_lead_emp_id      BIGINT       = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -102,11 +106,19 @@ BEGIN
      --   IF @task_type NOT IN (1,2,3)
      --       SET @should_assign = 1;
      --   ELSE IF CAST(GETDATE() AS DATE) >= @task_start_date
-     --           AND dbo.fn_is_non_working_day(CAST(GETDATE() AS DATE)) = 0
+     --           AND dbo.fn_is_non_working_day(CAST(GETDATE() AS DATE), @emp_id) = 0
      --       SET @should_assign = 1;
 
         IF @should_assign = 1
         BEGIN
+            -- Generate ONE numeric group_id for the entire group
+            DECLARE @group_id_val BIGINT = NULL;
+
+            IF @assign_mode = 'GROUP'
+            BEGIN
+                SELECT @group_id_val = ISNULL(MAX(group_id), 0) + 1 FROM task_execution_log;
+            END
+
             DECLARE emp_cursor CURSOR FOR
                 SELECT CAST(TRIM(value) AS BIGINT)
                 FROM STRING_SPLIT(@emp_list, ',')
@@ -120,11 +132,16 @@ BEGIN
                 INSERT INTO task_execution_log (
                     task_id, emp_id, assigned_by, task_status,
                     started_at, extended_date, rejection_count,
+                    group_id, is_team_lead, is_active,
                     created_at, updated_at
                 )
                 VALUES (
                     @task_id, @emp_id, @created_by, 0,
-                    NULL, NULL, 0, @now, @now
+                    NULL, NULL, 0,
+                    @group_id_val,
+                    CASE WHEN @assign_mode = 'GROUP' AND @emp_id = @team_lead_emp_id THEN 1 ELSE 0 END,
+                    1,
+                    @now, @now
                 );
 
                 SET @exec_log_id = SCOPE_IDENTITY();

@@ -5,6 +5,7 @@ import StatusBadge from '../common/StatusBadge';
 import PriorityBadge from '../common/PriorityBadge';
 import { formatDate } from '../../utils/formatters';
 import { MdAccessTime, MdGroups, MdHistory } from 'react-icons/md';
+import { API_BASE_URL } from '../../api/axios';
 import './TaskCard.css';
 
 const GroupTaskCard = ({ members, onAction }) => {
@@ -42,6 +43,7 @@ const GroupTaskCard = ({ members, onAction }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <PriorityBadge priority={task.priority_type} />
+                        <StatusBadge status={status} />
                         <span className="task-group-tag">👥 GROUP TASK</span>
                         {task.extended_date && <span className="task-extended-tag">Extended</span>}
                     </div>
@@ -64,36 +66,33 @@ const GroupTaskCard = ({ members, onAction }) => {
             <h3 className="task-card-title">{task.task_title}</h3>
             {task.task_description && <p className="task-card-desc">{task.task_description}</p>}
 
-            {/* Members Status List */}
-            <div className="group-members-status-box" style={{
-                margin: '15px 0',
-                padding: '12px',
-                background: '#f8f9fa',
-                borderRadius: '8px',
-                border: '1px solid #eef0f2'
+            {/* Group Members Section (Matching TaskCard bubble style) */}
+            <div style={{
+                marginTop: '12px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '15px'
             }}>
-                <h4 style={{ fontSize: '0.85rem', color: '#666', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <MdGroups /> Member Status
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {members.map(member => (
-                        <div key={member.execution_log_id} style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            fontSize: '0.85rem',
-                            padding: '4px 8px',
-                            background: 'white',
-                            borderRadius: '4px',
-                            border: '1px solid #eee'
-                        }}>
-                            <span style={{ fontWeight: member.is_team_lead ? 'bold' : 'normal' }}>
-                                {member.emp_name} {member.is_team_lead ? '⭐' : ''}
-                            </span>
-                            <StatusBadge status={member.task_status !== undefined ? member.task_status : member.status} mini />
-                        </div>
-                    ))}
-                </div>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#555' }}>members:-</span>
+                {members.map((member, index) => (
+                    <div key={index} style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 10px',
+                        background: 'rgba(67, 97, 238, 0.05)',
+                        border: '1px solid #4361ee',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        color: '#4361ee',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap'
+                    }}>
+                        {member.is_team_lead ? '⭐ ' : ''}{member.emp_name}
+                    </div>
+                ))}
             </div>
 
             <div className="task-card-meta">
@@ -104,6 +103,67 @@ const GroupTaskCard = ({ members, onAction }) => {
                     </span>
                 </div>
             </div>
+
+            {/* Attachments Section - Collated from all members */}
+            {(() => {
+                const allAttachments = [];
+                members.forEach(m => {
+                    if (m.attachments) {
+                        m.attachments.forEach(att => {
+                            if (!allAttachments.find(existing => existing.file_url === att.file_url)) {
+                                allAttachments.push(att);
+                            }
+                        });
+                    }
+                });
+
+                if (allAttachments.length === 0) return null;
+
+                const managerFiles = allAttachments.filter(f => !f.is_employee_upload);
+                const employeeFiles = allAttachments.filter(f => f.is_employee_upload);
+
+                return (
+                    <div className="task-attachments" style={{ marginTop: 10, padding: '0 4px' }}>
+                        {managerFiles.length > 0 && (
+                            <div style={{ marginBottom: employeeFiles.length > 0 ? 8 : 0 }}>
+                                <strong style={{ fontSize: 13, display: 'block', color: '#555' }}>Attachments (Manager):</strong>
+                                {managerFiles.map((file, index) => (
+                                    <div key={index} style={{ marginTop: 4 }}>
+                                        <a
+                                            href={`${API_BASE_URL}${file.file_url}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{ fontSize: 13, color: '#007bff', textDecoration: 'none' }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            📎 {file.file_name}
+                                        </a>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {employeeFiles.length > 0 && (
+                            <div>
+                                <strong style={{ fontSize: 13, display: 'block', color: '#555' }}>Member Uploads:</strong>
+                                {employeeFiles.map((file, index) => (
+                                    <div key={index} style={{ marginTop: 4 }}>
+                                        <a
+                                            href={`${API_BASE_URL}${file.file_url}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{ fontSize: 13, color: '#28a745', textDecoration: 'none' }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            📎 {file.file_name} <small style={{ color: '#888' }}>({file.uploaded_by})</small>
+                                        </a>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
 
             <div className="task-card-actions">
                 <div className="btn-group">

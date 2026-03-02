@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
+import useWebSockets from '../hooks/useWebSockets';
 import {
     PieChart, Pie, Cell,
     BarChart, Bar, XAxis, YAxis,
@@ -33,6 +34,15 @@ const DashboardPage = () => {
     const employeeListRef = useRef([]);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
+
+    // WebSocket auto-refresh
+    useWebSockets((data) => {
+        if (data.action === 'refresh') {
+            fetchDashboard();
+            if (selectedLabel) fetchFilteredTasks(selectedLabel);
+            toast.info(data.message || 'Data updated');
+        }
+    });
 
     const fetchDashboard = useCallback(async () => {
         setLoading(true);
@@ -85,9 +95,9 @@ const DashboardPage = () => {
                 params.set('employee_id', selectedEmp);
             }
 
-            if (label === 'In Progress') params.set('task_status', 1);
-            else if (label === 'Submitted') params.set('task_status', 2);
-            else if (label === 'Approved') params.set('task_status', 3);
+            if (label === 'In Progress') params.set('status', 1);
+            else if (label === 'Submitted') params.set('status', 2);
+            else if (label === 'Approved') params.set('status', 3);
             else if (label === 'Pending') params.set('filter_group', 'PENDING');
             else if (label === 'Overdue') params.set('overdue_only', 1);
 
@@ -339,6 +349,7 @@ const DashboardPage = () => {
                         <button
                             onClick={() => {
                                 setDateFrom(''); setDateTo(''); setSelectedEmp('');
+                                setEmpSearch('');
                             }}
                             style={{
                                 shadow: 'none', padding: '8px 18px', borderRadius: 6,
@@ -562,11 +573,11 @@ const DashboardPage = () => {
                                 <Pie
                                     data={data.status_chart}
                                     dataKey="value"
-                                    nameKey="name"
+                                    nameKey="status_name"
                                     cx="50%" cy="50%"
                                     outerRadius={80}
-                                    label={({ name, value }) =>
-                                        `${name}: ${value}`
+                                    label={({ status_name, value }) =>
+                                        `${status_name}: ${value}`
                                     }
                                 >
                                     {data.status_chart.map((entry, index) => (

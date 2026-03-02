@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
+import useWebSockets from '../hooks/useWebSockets';
 import TaskCard from '../components/tasks/TaskCard';
 import GroupTaskCard from '../components/tasks/GroupTaskCard';
 import TaskFilters from '../components/tasks/TaskFilters';
@@ -15,6 +16,14 @@ const AssignedByMePage = () => {
     const [actionModal, setActionModal] = useState(null);
     const [shiftInfo, setShiftInfo] = useState(null);
     const [pendingExtend, setPendingExtend] = useState(null);
+
+    // WebSocket auto-refresh
+    useWebSockets((data) => {
+        if (data.action === 'refresh') {
+            fetchTasks();
+            toast.info(data.message || 'Tasks updated');
+        }
+    });
 
     const fetchTasks = useCallback(async () => {
         setLoading(true);
@@ -70,7 +79,7 @@ const AssignedByMePage = () => {
         }
     };
 
-    const submitAction = async ({ remarks, extended_date, title, description, emp_list }) => {
+    const submitAction = async ({ remarks, extended_date, title, description, emp_list, team_lead_emp_id }) => {
         try {
             if (actionModal.actionType === 'edit') {
                 // ✅ Validate required fields
@@ -88,6 +97,7 @@ const AssignedByMePage = () => {
 
                 if (emp_list?.trim()) payload.emp_list = emp_list.trim();
                 if (extended_date?.trim()) payload.deadline = extended_date.trim();
+                if (team_lead_emp_id) payload.team_lead_emp_id = team_lead_emp_id;
 
                 // ✅ Send POST to backend
                 const response = await api.post('/tasks/edit/', payload);
