@@ -22,12 +22,12 @@ BEGIN
     SELECT
         COUNT(*) AS total_tasks,
         SUM(CASE WHEN el.task_status = 0 THEN 1 ELSE 0 END) AS assigned_count,
-        SUM(CASE WHEN el.task_status IN (1, 5) THEN 1 ELSE 0 END) AS in_progress_count,
+        SUM(CASE WHEN el.task_status = 1 THEN 1 ELSE 0 END) AS in_progress_count, -- CHANGED: Status 5 moved to Pending
         SUM(CASE WHEN el.task_status = 2 THEN 1 ELSE 0 END) AS submitted_count,
         SUM(CASE WHEN el.task_status = 3 THEN 1 ELSE 0 END) AS approved_count,
         SUM(CASE WHEN el.task_status = 4 THEN 1 ELSE 0 END) AS rejected_count,
         SUM(CASE WHEN el.task_status = 6 THEN 1 ELSE 0 END) AS cancelled_count,
-        SUM(CASE WHEN el.task_status = 0 THEN 1 ELSE 0 END) AS pending_count,
+        SUM(CASE WHEN el.task_status IN (0, 4, 5) THEN 1 ELSE 0 END) AS pending_count, -- CHANGED: Consistent with UI
         SUM(CASE WHEN el.extended_date IS NOT NULL THEN 1 ELSE 0 END) AS extended_count,
         SUM(CASE WHEN COALESCE(el.extended_date, td.task_end_date) < GETDATE()
                  AND el.task_status NOT IN (3, 6) THEN 1 ELSE 0 END) AS overdue_count,

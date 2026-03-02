@@ -3,7 +3,6 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../common/StatusBadge';
 import PriorityBadge from '../common/PriorityBadge';
-import { STATUS_MAP, PRIORITY_MAP } from '../../utils/constants';
 import { formatDate } from '../../utils/formatters';
 import { MdAccessTime, MdGroups, MdHistory } from 'react-icons/md';
 import './TaskCard.css';

@@ -6,7 +6,6 @@ import api from '../api/axios';
 import { toast } from 'react-toastify';
 import PriorityBadge from '../components/common/PriorityBadge';
 import StatusBadge from '../components/common/StatusBadge';
-import { STATUS_MAP, PRIORITY_MAP } from '../utils/constants';
 import { formatDate, formatDateWithDay } from '../utils/formatters';
 import { MdWarning } from 'react-icons/md';
 
