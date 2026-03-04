@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
-import useWebSockets from '../hooks/useWebSockets';
+import { usePolling } from '../hooks/usePolling';
+import { config } from '../config';
 import TaskCard from '../components/tasks/TaskCard';
 import GroupTaskCard from '../components/tasks/GroupTaskCard';
 import TaskFilters from '../components/tasks/TaskFilters';
@@ -17,13 +18,10 @@ const AssignedByMePage = () => {
     const [shiftInfo, setShiftInfo] = useState(null);
     const [pendingExtend, setPendingExtend] = useState(null);
 
-    // WebSocket auto-refresh
-    useWebSockets((data) => {
-        if (data.action === 'refresh') {
-            fetchTasks();
-            toast.info(data.message || 'Tasks updated');
-        }
-    });
+    // AJAX Polling for real-time updates (every 10 seconds)
+    usePolling(() => {
+        fetchTasks();
+    }, config.POLLING_INTERVAL);
 
     const fetchTasks = useCallback(async () => {
         setLoading(true);
@@ -218,52 +216,16 @@ const AssignedByMePage = () => {
                 </div>
             ) : (
                 (() => {
-                    // Step 1: Group tasks by group_id
-                    const groups = tasks.reduce((acc, t) => {
+                    // Group tasks using Map to preserve insertion order (backend sort)
+                    const groupsMap = new Map();
+                    tasks.forEach(t => {
                         const key = t.group_id || `ind_${t.execution_log_id}`;
-                        if (!acc[key]) acc[key] = [];
-                        acc[key].push(t);
-                        return acc;
-                    }, {});
+                        if (!groupsMap.has(key)) groupsMap.set(key, []);
+                        groupsMap.get(key).push(t);
+                    });
 
-                    // Step 2: Re-sort groups so Under Review groups appear at the top,
-                    // then by most recent updated_at. Uses Team Lead's status as the
-                    // authoritative status for group tasks (avoids a single out-of-sync
-                    // member incorrectly lifting the whole group to the top).
-                    const UNDER_REVIEW = new Set([2, 5]);
-
-                    const getEffectiveStatus = (members) => {
-                        // For group tasks → use Team Lead's status (authoritative)
-                        // For individual tasks → use the only member's status
-                        const lead = members.find(
-                            m => m.is_team_lead === 1 || m.is_team_lead === true
-                        );
-                        const ref = lead || members[0];
-                        return Number(ref.task_status ?? ref.status ?? 0);
-                    };
-
-                    const getLatestUpdated = (members) =>
-                        Math.max(
-                            ...members.map(m => new Date(m.updated_at || 0).getTime())
-                        );
-
-                    const sortedGroups = Object.entries(groups).sort(
-                        ([, membersA], [, membersB]) => {
-                            const aUnderReview = UNDER_REVIEW.has(getEffectiveStatus(membersA));
-                            const bUnderReview = UNDER_REVIEW.has(getEffectiveStatus(membersB));
-
-                            // Under Review → priority 0 (top of list)
-                            if (aUnderReview !== bUnderReview) {
-                                return aUnderReview ? -1 : 1;
-                            }
-
-                            // Same priority tier → most recently changed task first
-                            return getLatestUpdated(membersB) - getLatestUpdated(membersA);
-                        }
-                    );
-
-                    return sortedGroups.map(([key, groupMembers]) => {
-                        const isGroup = !key.startsWith('ind_');
+                    return Array.from(groupsMap.entries()).map(([key, groupMembers]) => {
+                        const isGroup = typeof key === 'number';
                         if (isGroup) {
                             return (
                                 <GroupTaskCard

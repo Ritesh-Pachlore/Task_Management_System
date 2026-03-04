@@ -5,7 +5,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
-import useWebSockets from '../hooks/useWebSockets';
+import { usePolling } from '../hooks/usePolling';
+import { config } from '../config';
 import {
     PieChart, Pie, Cell,
     BarChart, Bar, XAxis, YAxis,
@@ -35,14 +36,11 @@ const DashboardPage = () => {
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
 
-    // WebSocket auto-refresh
-    useWebSockets((data) => {
-        if (data.action === 'refresh') {
-            fetchDashboard();
-            if (selectedLabel) fetchFilteredTasks(selectedLabel);
-            toast.info(data.message || 'Data updated');
-        }
-    });
+    // AJAX Polling for real-time updates (every 10 seconds)
+    usePolling(() => {
+        fetchDashboard();
+        if (selectedLabel) fetchFilteredTasks(selectedLabel);
+    }, config.POLLING_INTERVAL);
 
     const fetchDashboard = useCallback(async () => {
         setLoading(true);

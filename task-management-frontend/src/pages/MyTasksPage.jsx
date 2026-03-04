@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
-import useWebSockets from '../hooks/useWebSockets';
+import { usePolling } from '../hooks/usePolling';
+import { config } from '../config';
 import TaskCard from '../components/tasks/TaskCard';
 import TaskFilters from '../components/tasks/TaskFilters';
 import ActionModal from '../components/common/ActionModal';
@@ -12,13 +13,10 @@ const MyTasksPage = () => {
     const [filters, setFilters] = useState({});
     const [actionModal, setActionModal] = useState(null);
 
-    // WebSocket auto-refresh
-    useWebSockets((data) => {
-        if (data.action === 'refresh') {
-            fetchTasks();
-            toast.info(data.message || 'Tasks updated');
-        }
-    });
+    // AJAX Polling for real-time updates (every 10 seconds)
+    usePolling(() => {
+        fetchTasks();
+    }, config.POLLING_INTERVAL);
 
     const fetchTasks = useCallback(async () => {
         setLoading(true);

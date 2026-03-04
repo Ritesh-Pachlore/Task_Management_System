@@ -1,6 +1,6 @@
 // src/components/tasks/TaskCard.jsx
 import React from 'react';
-import api, { API_BASE_URL } from '../../api/axios';
+import { API_BASE_URL } from '../../api/axios';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../common/StatusBadge';
 import PriorityBadge from '../common/PriorityBadge';
@@ -270,7 +270,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                         className="btn btn-sm btn-outline"
                         onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/ task / ${task.execution_log_id} `);
+                            navigate(`/task/${task.execution_log_id}`);
                         }}
                     >
                         <MdHistory /> History

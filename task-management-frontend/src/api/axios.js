@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Single source of truth — change this IP to move to a different server
-export const API_BASE_URL = 'http://172.16.24.225:8001';
+export const API_BASE_URL = 'https://alcohol-physically-button-careful.trycloudflare.com'; //'http://172.16.24.225:8001';
 
 // Points to your Django server
 const api = axios.create({

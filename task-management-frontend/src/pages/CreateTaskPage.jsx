@@ -266,7 +266,24 @@ const CreateTaskPage = () => {
 
         if (form.task_type === 5) { // Time Bound
             if (!form.task_end_date) { toast.error('End date required'); return false; }
+            if (form.task_end_date < form.task_start_date) {
+                toast.error('End date cannot be before start date');
+                return false;
+            }
             if (!form.start_time || !form.end_time) { toast.error('Times required'); return false; }
+        }
+
+        // Past date check
+        if (form.task_type !== 2 && form.task_start_date < todayStr) {
+            toast.error('Start date cannot be in the past');
+            return false;
+        }
+
+        if ([1, 2, 3].includes(form.task_type) && form.recurrence_end_date) {
+            if (form.recurrence_end_date < form.task_start_date) {
+                toast.error('Recurrence end date cannot be before start date');
+                return false;
+            }
         }
 
         return true;
@@ -419,7 +436,7 @@ const CreateTaskPage = () => {
                         )}
                     </div>
 
-                 
+
 
                     {/* ══════════════════════════════════════════
                         SECTION 2: Task Type toggle buttons
@@ -473,6 +490,7 @@ const CreateTaskPage = () => {
                                 <input
                                     type="date"
                                     className="form-control"
+                                    min={todayStr}
                                     value={form.task_start_date}
                                     onChange={e => handleDateChange('task_start_date', e.target.value)}
                                 />

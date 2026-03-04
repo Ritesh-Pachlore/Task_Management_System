@@ -34,7 +34,6 @@ INSTALLED_APPS = [
      'django.contrib.sessions',
     'rest_framework',          # Django REST Framework
     'corsheaders',             # CORS for React
-    'channels',                # Real-time WebSockets
     'apps.authentication',     # Our auth app
     'apps.tasks',              # Our tasks app
     'django_apscheduler',      # Scheduler — tables fixed via fix_apscheduler_tables.sql
@@ -100,28 +99,10 @@ JWT_SECRET_KEY = "standalone-task-mgmt-secret-key-2025"
 JWT_EXPIRATION_HOURS = 24    # Token valid for 24 hours
 
 
-ASGI_APPLICATION = 'config.asgi.application'
 
 
-# Windows Testing Mode (no Redis needed)
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
 
 
-# ════════════════════════════════════════
-# CHANNEL LAYERS (Disabled for now)
-# ════════════════════════════════════════
-# CHANNEL_LAYERS = {  
-#     'default': {
-#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#         'CONFIG': {
-#             "hosts": [('127.0.0.1', 6379)],
-#         },
-#     },
-# }
 
 
 
