@@ -218,7 +218,7 @@ const AssignedByMePage = () => {
                 </div>
             ) : (
                 (() => {
-                    // Group tasks by group_id
+                    // Step 1: Group tasks by group_id
                     const groups = tasks.reduce((acc, t) => {
                         const key = t.group_id || `ind_${t.execution_log_id}`;
                         if (!acc[key]) acc[key] = [];
@@ -226,7 +226,43 @@ const AssignedByMePage = () => {
                         return acc;
                     }, {});
 
-                    return Object.entries(groups).map(([key, groupMembers]) => {
+                    // Step 2: Re-sort groups so Under Review groups appear at the top,
+                    // then by most recent updated_at. Uses Team Lead's status as the
+                    // authoritative status for group tasks (avoids a single out-of-sync
+                    // member incorrectly lifting the whole group to the top).
+                    const UNDER_REVIEW = new Set([2, 5]);
+
+                    const getEffectiveStatus = (members) => {
+                        // For group tasks → use Team Lead's status (authoritative)
+                        // For individual tasks → use the only member's status
+                        const lead = members.find(
+                            m => m.is_team_lead === 1 || m.is_team_lead === true
+                        );
+                        const ref = lead || members[0];
+                        return Number(ref.task_status ?? ref.status ?? 0);
+                    };
+
+                    const getLatestUpdated = (members) =>
+                        Math.max(
+                            ...members.map(m => new Date(m.updated_at || 0).getTime())
+                        );
+
+                    const sortedGroups = Object.entries(groups).sort(
+                        ([, membersA], [, membersB]) => {
+                            const aUnderReview = UNDER_REVIEW.has(getEffectiveStatus(membersA));
+                            const bUnderReview = UNDER_REVIEW.has(getEffectiveStatus(membersB));
+
+                            // Under Review → priority 0 (top of list)
+                            if (aUnderReview !== bUnderReview) {
+                                return aUnderReview ? -1 : 1;
+                            }
+
+                            // Same priority tier → most recently changed task first
+                            return getLatestUpdated(membersB) - getLatestUpdated(membersA);
+                        }
+                    );
+
+                    return sortedGroups.map(([key, groupMembers]) => {
                         const isGroup = !key.startsWith('ind_');
                         if (isGroup) {
                             return (

@@ -182,7 +182,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                                 {managerFiles.map((file, index) => (
                                     <div key={index} style={{ marginTop: 4 }}>
                                         <a
-                                            href={`${API_BASE_URL}${file.file_url} `}
+                                            href={`${API_BASE_URL}${file.file_url}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             style={{ fontSize: 13, color: '#007bff' }}
@@ -201,7 +201,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                                 {employeeFiles.map((file, index) => (
                                     <div key={index} style={{ marginTop: 4 }}>
                                         <a
-                                            href={`${API_BASE_URL}${file.file_url} `}
+                                            href={`${API_BASE_URL}${file.file_url}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             style={{ fontSize: 13, color: '#28a745' }}

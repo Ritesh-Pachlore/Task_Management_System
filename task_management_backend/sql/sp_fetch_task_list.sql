@@ -143,6 +143,7 @@ BEGIN
          WHERE tl.group_id = el.group_id AND tl.emp_id <> el.emp_id
            AND tl.is_active = 1) AS group_member_names,
 
+        el.updated_at,          -- ← needed for frontend secondary sort
         @view_type AS view_type
 
     FROM task_details td
