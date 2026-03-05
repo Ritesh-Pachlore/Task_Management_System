@@ -32,37 +32,37 @@ BEGIN
         END AS status_name,
 
         -- Current deadline
-        COALESCE(el.extended_date, td.task_end_date) AS current_deadline,
+        COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS current_deadline,
 
         -- Why is it affected?
         CASE 
-            WHEN dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE), el.emp_id) = 1
+            WHEN dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE), el.emp_id) = 1
             THEN 'Weekly Off/Holiday'
             ELSE NULL
         END AS reason,
 
         -- Suggested shifted date
         dbo.fn_get_next_working_day(
-            CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE),
+            CAST(COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE),
             el.emp_id
         ) AS suggested_date,
 
         -- Days until deadline
-        DATEDIFF(DAY, GETDATE(), COALESCE(el.extended_date, td.task_end_date)) AS days_until_deadline
+        DATEDIFF(DAY, GETDATE(), COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END)) AS days_until_deadline
 
     FROM task_details td
     INNER JOIN task_execution_log el ON td.task_id = el.task_id
     WHERE td.is_active = 1
       AND el.task_status NOT IN (3, 6)  -- Not completed/cancelled
       -- Only FUTURE deadlines (not past)
-      AND COALESCE(el.extended_date, td.task_end_date) >= GETDATE()
+      AND COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) >= GETDATE()
       -- Deadline IS on a holiday/Sunday
       AND dbo.fn_is_non_working_day(
-          CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE),
+          CAST(COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE),
           el.emp_id
       ) = 1
       -- View type filter
       AND ((@view_type = 'SELF' AND el.emp_id = @emp_id)
            OR (@view_type = 'ASSIGNED_BY_ME' AND el.assigned_by = @emp_id))
-    ORDER BY COALESCE(el.extended_date, td.task_end_date) ASC;
+    ORDER BY COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) ASC;
 END

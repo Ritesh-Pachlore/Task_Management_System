@@ -14,7 +14,8 @@ import {
 } from 'recharts';
 import {
     MdWarning, MdTrendingUp, MdAssignment,
-    MdCheckCircle, MdError, MdSchedule, MdClose
+    MdCheckCircle, MdError, MdSchedule, MdClose,
+    MdArrowUpward, MdArrowDownward
 } from 'react-icons/md';
 import { formatDate, getDaysText } from '../utils/formatters';
 
@@ -31,6 +32,7 @@ const DashboardPage = () => {
     const [filteredLoading, setFilteredLoading] = useState(false);
     const [empSearch, setEmpSearch] = useState('');
     const [showEmpDropdown, setShowEmpDropdown] = useState(false);
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
     const employeeListRef = useRef([]);
     const dropdownRef = useRef(null);
@@ -132,6 +134,19 @@ const DashboardPage = () => {
             fetchFilteredTasks(selectedLabel);
         }
     }, [selectedLabel, fetchFilteredTasks]);
+
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (key) => {
+        if (sortConfig.key !== key) return <span style={{ opacity: 0.3 }}><MdArrowUpward style={{ fontSize: 12 }} /></span>;
+        return sortConfig.direction === 'asc' ? <MdArrowUpward /> : <MdArrowDownward />;
+    };
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -452,13 +467,19 @@ const DashboardPage = () => {
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Employee</th>
+                                            <th onClick={() => handleSort('emp_name')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                                                Employee {getSortIcon('emp_name')}
+                                            </th>
                                             <th>Department</th>
                                             <th>Task Title</th>
                                             <th>Description</th>
                                             <th>Priority</th>
-                                            <th>Start Date</th>
-                                            <th>End Date</th>
+                                            <th onClick={() => handleSort('display_start_date')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                                                Start Date {getSortIcon('display_start_date')}
+                                            </th>
+                                            <th onClick={() => handleSort('display_end_date')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                                                End Date {getSortIcon('display_end_date')}
+                                            </th>
                                             <th>Due by</th>
                                         </tr>
                                     </thead>
@@ -471,17 +492,35 @@ const DashboardPage = () => {
                                             </tr>
                                         ) : (
                                             (() => {
-                                                // Group tasks by group_id (numeric BIGINT)
-                                                // Individual tasks use their execution_log_id as a unique key
-                                                const grouped = filteredTasks.reduce((acc, t) => {
-                                                    const key = t.group_id || `ind_${t.execution_log_id}`;
-                                                    if (!acc[key]) acc[key] = [];
-                                                    acc[key].push(t);
-                                                    return acc;
-                                                }, {});
+                                                // Apply sorting if configured
+                                                let sortedTasks = [...filteredTasks];
+                                                if (sortConfig.key) {
+                                                    sortedTasks.sort((a, b) => {
+                                                        let valA = a[sortConfig.key] || '';
+                                                        let valB = b[sortConfig.key] || '';
 
-                                                return Object.entries(grouped).map(([key, groupMembers], gIdx) => {
-                                                    const isGroup = !key.startsWith('ind_');
+                                                        // Handle date strings
+                                                        if (sortConfig.key.includes('date')) {
+                                                            valA = new Date(valA);
+                                                            valB = new Date(valB);
+                                                        }
+
+                                                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                                                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                                                        return 0;
+                                                    });
+                                                }
+
+                                                // Group tasks using Map to preserve backend sort order (or new sort order)
+                                                const groupsMap = new Map();
+                                                sortedTasks.forEach(t => {
+                                                    const key = t.group_id || `ind_${t.execution_log_id}`;
+                                                    if (!groupsMap.has(key)) groupsMap.set(key, []);
+                                                    groupsMap.get(key).push(t);
+                                                });
+
+                                                return Array.from(groupsMap.entries()).map(([key, groupMembers], gIdx) => {
+                                                    const isGroup = typeof key === 'number';
                                                     const bgColor = isGroup ? (gIdx % 2 === 0 ? '#f0f7ff' : '#f5faff') : 'transparent';
 
                                                     return groupMembers.map((task, mIdx) => {
@@ -533,10 +572,10 @@ const DashboardPage = () => {
                                                                     </span>
                                                                 </td>
                                                                 <td style={{ borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee' }}>
-                                                                    {formatDate(task.task_start_date) || 'N/A'}
+                                                                    {formatDate(task.display_start_date) || 'N/A'}
                                                                 </td>
                                                                 <td style={{ borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee' }}>
-                                                                    {formatDate(task.effective_deadline)}
+                                                                    {formatDate(task.display_end_date)}
                                                                 </td>
                                                                 <td style={{
                                                                     color: currentStatus === 3 ? '#4CAF50' : (isOverdue ? '#f44336' : '#999'),
@@ -569,13 +608,13 @@ const DashboardPage = () => {
                         <ResponsiveContainer width="100%" height={250}>
                             <PieChart>
                                 <Pie
-                                    data={data.status_chart}
+                                    data={data.status_chart.filter(e => e.status_name != null)}
                                     dataKey="value"
                                     nameKey="status_name"
                                     cx="50%" cy="50%"
                                     outerRadius={80}
                                     label={({ status_name, value }) =>
-                                        `${status_name}: ${value}`
+                                        `${status_name || ''}: ${value}`
                                     }
                                 >
                                     {data.status_chart.map((entry, index) => (

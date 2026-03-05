@@ -36,8 +36,8 @@ const TaskCard = ({ task, viewType, onAction }) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Parse task_start_date robustly
-    const startDate = new Date(task.task_start_date);
+    // Parse display_start_date robustly (falling back to task_start_date)
+    const startDate = new Date(task.display_start_date || task.task_start_date);
     startDate.setHours(0, 0, 0, 0);
 
     const isFutureStart = startDate > today;
@@ -62,7 +62,8 @@ const TaskCard = ({ task, viewType, onAction }) => {
 
             // Only Lead or Individual Task can take actions
             if (!isGroup || isLead) {
-                if (status === 0 && !isFutureStart) {
+                // Show Start if scheduled date reached, OR if manager explicitly allowed early start (status 8)
+                if ((status === 0 && !isFutureStart) || status === 8) {
                     actions.push({ type: 1, label: 'Start', cls: 'btn-primary' });
                 }
                 if (status === 1) actions.push({ type: 2, label: 'Submit', cls: 'btn-success' });
@@ -73,6 +74,10 @@ const TaskCard = ({ task, viewType, onAction }) => {
 
         if (viewType === 'ASSIGNED_BY_ME') {
             // Manager actions
+            // Show 'Allow Early Start' only if future-dated AND not yet allowed (status != 8)
+            if (status === 0 && isFutureStart) {
+                actions.push({ type: 9, label: 'Allow Early Start', cls: 'btn-primary' });
+            }
             if (status === 2 || status === 5) {
                 actions.push({ type: 3, label: 'Approve', cls: 'btn-success' });
                 actions.push({ type: 4, label: 'Reject', cls: 'btn-danger' });
@@ -231,12 +236,12 @@ const TaskCard = ({ task, viewType, onAction }) => {
                     <MdAccessTime />
                     <span>
                         {task.task_type === 1
-                            ? `Daily Task${!isInfinite ? ' | Due: ' + formatDate(task.effective_deadline) : ''} `
+                            ? `Daily Task${!isInfinite ? ' | Due: ' + formatDate(task.display_end_date) : ''} `
                             : task.task_type === 2
-                                ? `Weekly task on ${task.weekly_days || 'N/A'}${(!isInfinite && task.effective_deadline) ? ' | Due: ' + formatDate(task.effective_deadline) : ''} `
+                                ? `Weekly task on ${task.weekly_days || 'N/A'}${(!isInfinite && task.display_end_date) ? ' | Due: ' + formatDate(task.display_end_date) : ''} `
                                 : task.task_type === 3
-                                    ? `Monthly task on ${task.monthly_day_of_month ? task.monthly_day_of_month + getSuffix(task.monthly_day_of_month) : 'N/A'}${(!isInfinite && task.effective_deadline) ? ' | Due: ' + formatDate(task.effective_deadline) : ''} `
-                                    : formatDate(task.effective_deadline)
+                                    ? `Monthly task on ${task.monthly_day_of_month ? task.monthly_day_of_month + getSuffix(task.monthly_day_of_month) : 'N/A'}${(!isInfinite && task.display_end_date) ? ' | Due: ' + formatDate(task.display_end_date) : ''} `
+                                    : formatDate(task.display_end_date)
                         }
                         {/* // Display "Starts in X days" */}
                         {!isInfinite && daysText && !isFutureStart && (

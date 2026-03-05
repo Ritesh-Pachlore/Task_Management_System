@@ -21,19 +21,19 @@ BEGIN
     ------------------------------------------------------------
     SELECT
         COUNT(*) AS total_tasks,
-        SUM(CASE WHEN el.task_status = 0 THEN 1 ELSE 0 END) AS assigned_count,
-        SUM(CASE WHEN el.task_status = 1 THEN 1 ELSE 0 END) AS in_progress_count, -- CHANGED: Status 5 moved to Pending
+        SUM(CASE WHEN el.task_status IN (0, 8) THEN 1 ELSE 0 END) AS assigned_count,
+        SUM(CASE WHEN el.task_status = 1 THEN 1 ELSE 0 END) AS in_progress_count,
         SUM(CASE WHEN el.task_status = 2 THEN 1 ELSE 0 END) AS submitted_count,
         SUM(CASE WHEN el.task_status = 3 THEN 1 ELSE 0 END) AS approved_count,
         SUM(CASE WHEN el.task_status = 4 THEN 1 ELSE 0 END) AS rejected_count,
         SUM(CASE WHEN el.task_status = 6 THEN 1 ELSE 0 END) AS cancelled_count,
-        SUM(CASE WHEN el.task_status IN (0, 4, 5) THEN 1 ELSE 0 END) AS pending_count, -- CHANGED: Consistent with UI
+        SUM(CASE WHEN el.task_status IN (0, 4, 5, 8) THEN 1 ELSE 0 END) AS pending_count,
         SUM(CASE WHEN el.extended_date IS NOT NULL THEN 1 ELSE 0 END) AS extended_count,
-        SUM(CASE WHEN COALESCE(el.extended_date, td.task_end_date) < GETDATE()
+        SUM(CASE WHEN COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) < GETDATE()
                  AND el.task_status NOT IN (3, 6) THEN 1 ELSE 0 END) AS overdue_count,
         SUM(CASE WHEN el.task_status NOT IN (3, 6)
-                 AND COALESCE(el.extended_date, td.task_end_date) >= GETDATE()
-                 AND dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, td.task_end_date) AS DATE), el.emp_id) = 1
+                 AND COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) >= GETDATE()
+                 AND dbo.fn_is_non_working_day(CAST(COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE), el.emp_id) = 1
                  THEN 1 ELSE 0 END) AS holiday_affected_count
     FROM task_execution_log el
     INNER JOIN task_details td ON el.task_id = td.task_id
@@ -47,8 +47,8 @@ BEGIN
            OR (el.id = (SELECT MIN(el2.id) FROM task_execution_log el2 WHERE el2.task_id = el.task_id AND el2.group_id = el.group_id AND el2.is_active = 1)
                AND NOT EXISTS (SELECT 1 FROM task_execution_log el3 WHERE el3.task_id = el.task_id AND el3.group_id = el.group_id AND el3.is_team_lead = 1 AND el3.is_active = 1))
           )
-      AND (@date_from IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
-      AND (@date_to   IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
+      AND (@date_from IS NULL OR CAST(COALESCE(CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE) >= @date_from)
+      AND (@date_to   IS NULL OR CAST(COALESCE(CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id);
 
 
@@ -68,7 +68,7 @@ BEGIN
             SUM(CASE WHEN el.task_status = 0 THEN 1 ELSE 0 END) AS pending,
 
             SUM(CASE 
-                    WHEN COALESCE(el.extended_date, td.task_end_date) < GETDATE()
+                    WHEN COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) < GETDATE()
                          AND el.task_status NOT IN (3,6)
                     THEN 1 ELSE 0
                 END) AS overdue,
@@ -82,8 +82,8 @@ BEGIN
           AND td.is_active = 1 
           AND el.is_active = 1 -- ADDED: Filter inactive assignments
           AND el.task_status <> 6
-          AND (@date_from    IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
-          AND (@date_to      IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
+          AND (@date_from    IS NULL OR CAST(COALESCE(CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE) >= @date_from)
+          AND (@date_to      IS NULL OR CAST(COALESCE(CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE) <= @date_to)
           AND (@employee_id  IS NULL OR el.emp_id = @employee_id)
         GROUP BY el.emp_id ORDER BY overdue DESC;
     END
@@ -95,11 +95,11 @@ BEGIN
     END
 
     ------------------------------------------------------------
-    -- RESULT SET 3: Status chart
+    -- RESULT SET 3: Status chart (status 8 merged with status 0 as 'ASSIGNED')
     ------------------------------------------------------------
     SELECT
-        el.task_status AS status,
-        CASE el.task_status
+        CASE el.task_status WHEN 8 THEN 0 ELSE el.task_status END AS status,
+        CASE CASE el.task_status WHEN 8 THEN 0 ELSE el.task_status END
             WHEN 0 THEN 'ASSIGNED'
             WHEN 1 THEN 'STARTED'
             WHEN 2 THEN 'SUBMITTED'
@@ -110,7 +110,8 @@ BEGIN
             WHEN 7 THEN 'ON HOLD'
         END AS status_name,
         COUNT(*) AS value,
-        CASE el.task_status WHEN 0 THEN '#8884d8' WHEN 1 THEN '#82ca9d' WHEN 2 THEN '#ffc658'
+        CASE CASE el.task_status WHEN 8 THEN 0 ELSE el.task_status END
+            WHEN 0 THEN '#8884d8' WHEN 1 THEN '#82ca9d' WHEN 2 THEN '#ffc658'
             WHEN 3 THEN '#00C49F' WHEN 4 THEN '#FF6B6B' WHEN 5 THEN '#FFBB28'
             WHEN 6 THEN '#999999' WHEN 7 THEN '#673AB7' END AS color
     FROM task_execution_log el
@@ -123,10 +124,10 @@ BEGIN
            OR (el.id = (SELECT MIN(el2.id) FROM task_execution_log el2 WHERE el2.task_id = el.task_id AND el2.group_id = el.group_id AND el2.is_active = 1)
                AND NOT EXISTS (SELECT 1 FROM task_execution_log el3 WHERE el3.task_id = el.task_id AND el3.group_id = el.group_id AND el3.is_team_lead = 1 AND el3.is_active = 1))
           )
-      AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
-      AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
+      AND (@date_from   IS NULL OR CAST(COALESCE(CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE) >= @date_from)
+      AND (@date_to     IS NULL OR CAST(COALESCE(CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)
-    GROUP BY el.task_status;
+    GROUP BY CASE el.task_status WHEN 8 THEN 0 ELSE el.task_status END;
 
 
     ------------------------------------------------------------
@@ -153,8 +154,8 @@ BEGIN
            OR (el.id = (SELECT MIN(el2.id) FROM task_execution_log el2 WHERE el2.task_id = el.task_id AND el2.group_id = el.group_id AND el2.is_active = 1)
                AND NOT EXISTS (SELECT 1 FROM task_execution_log el3 WHERE el3.task_id = el.task_id AND el3.group_id = el.group_id AND el3.is_team_lead = 1 AND el3.is_active = 1))
           )
-      AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
-      AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
+      AND (@date_from   IS NULL OR CAST(COALESCE(CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE) >= @date_from)
+      AND (@date_to     IS NULL OR CAST(COALESCE(CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)
     GROUP BY td.priority_type
     ORDER BY td.priority_type;
@@ -171,7 +172,7 @@ BEGIN
         SUM(CASE WHEN el.task_status = 3 THEN 1 ELSE 0 END) AS completed,
 
         SUM(CASE 
-                WHEN COALESCE(el.extended_date, td.task_end_date) < GETDATE()
+                WHEN COALESCE(el.extended_date, CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) < GETDATE()
                      AND el.task_status NOT IN (3,6)
                 THEN 1 ELSE 0
             END) AS overdue
@@ -186,8 +187,8 @@ BEGIN
            OR (el.id = (SELECT MIN(el2.id) FROM task_execution_log el2 WHERE el2.task_id = el.task_id AND el2.group_id = el.group_id AND el2.is_active = 1)
                AND NOT EXISTS (SELECT 1 FROM task_execution_log el3 WHERE el3.task_id = el.task_id AND el3.group_id = el.group_id AND el3.is_team_lead = 1 AND el3.is_active = 1))
           )
-      AND (@date_from   IS NULL OR CAST(td.task_end_date AS DATE) >= @date_from)
-      AND (@date_to     IS NULL OR CAST(td.task_end_date AS DATE) <= @date_to)
+      AND (@date_from   IS NULL OR CAST(COALESCE(CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE) >= @date_from)
+      AND (@date_to     IS NULL OR CAST(COALESCE(CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, CASE WHEN td.task_type IN (1,2,3) THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) ELSE td.task_end_date END) AS DATE) <= @date_to)
       AND (@employee_id IS NULL OR el.emp_id = @employee_id)
     GROUP BY FORMAT(el.created_at, 'MMM yyyy'),
              FORMAT(el.created_at, 'yyyy-MM')

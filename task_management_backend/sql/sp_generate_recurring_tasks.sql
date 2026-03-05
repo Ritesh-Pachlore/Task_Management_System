@@ -161,19 +161,19 @@ BEGIN
                     SELECT @new_group_id_val = ISNULL(MAX(group_id), 0) + 1 FROM task_execution_log;
                 END
 
-                DECLARE @instance_deadline DATETIME = CAST(CAST(@target_date AS VARCHAR) + ' 23:59:59' AS DATETIME);
-                UPDATE task_details SET task_end_date = @instance_deadline WHERE task_id = @task_id;
+                DECLARE @instance_deadline DATETIME = DATEADD(SECOND, 86399, CAST(@target_date AS DATETIME));
+                -- REMOVED: UPDATE task_details SET task_end_date = @instance_deadline WHERE task_id = @task_id;
 
                 -- Insert for ALL active members originally on this task
                 INSERT INTO task_execution_log (
                     task_id, emp_id, assigned_by, task_status,
-                    started_at, extended_date, rejection_count,
+                    started_at, extended_date, instance_deadline, rejection_count,
                     group_id, is_team_lead, is_active,
                     created_at, updated_at
                 )
                 SELECT 
                     @task_id, emp_id, assigned_by, 0,
-                    NULL, NULL, 0,
+                    NULL, NULL, @instance_deadline, 0,
                     @new_group_id_val, is_team_lead, 1,
                     @now, @now
                 FROM task_execution_log

@@ -47,6 +47,23 @@ BEGIN
         td.task_start_date,
         td.task_end_date,
 
+        -- DISPLAY DATES: For recurring tasks, start = date portion of deadline (as they are one-day tasks)
+        CASE 
+            WHEN td.task_type IN (1, 2, 3) AND el.instance_deadline IS NOT NULL AND el.instance_deadline <= '2099-12-31'
+            THEN CAST(el.instance_deadline AS DATE)
+            ELSE COALESCE(CAST(el.created_at AS DATE), CAST(td.task_start_date AS DATE))
+        END AS display_start_date,
+        
+        COALESCE(
+            el.extended_date, 
+            CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, 
+            CASE 
+                WHEN td.task_type IN (1, 2, 3) 
+                THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) 
+                ELSE td.task_end_date 
+            END
+        ) AS display_end_date,
+
         CAST(td.task_start_date AS DATE) AS start_date_only,
         CAST(td.task_end_date   AS DATE) AS end_date_only,
 
@@ -84,22 +101,48 @@ BEGIN
             WHEN 4 THEN 'REJECTED'
             WHEN 5 THEN 'RESUBMITTED'
             WHEN 6 THEN 'CANCELLED'
+            WHEN 8 THEN 'ASSIGNED' -- Early start allowed
         END AS status_name,
 
         el.started_at,
         el.extended_date,
+        el.instance_deadline,
         el.rejection_count,
-
-        COALESCE(el.extended_date, td.task_end_date) AS effective_deadline,
+    
+        COALESCE(
+            el.extended_date, 
+            CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, 
+            CASE 
+                WHEN td.task_type IN (1, 2, 3) 
+                THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) 
+                ELSE td.task_end_date 
+            END
+        ) AS effective_deadline,
 
         CASE
             WHEN el.task_status IN (3,6) THEN NULL
             ELSE DATEDIFF(DAY, GETDATE(),
-                COALESCE(el.extended_date, td.task_end_date))
+                COALESCE(
+                    el.extended_date, 
+                    CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, 
+                    CASE 
+                        WHEN td.task_type IN (1, 2, 3) 
+                        THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) 
+                        ELSE td.task_end_date 
+                    END
+                ))
         END AS days_remaining,
 
         CASE
-            WHEN COALESCE(el.extended_date, td.task_end_date) < GETDATE()
+            WHEN COALESCE(
+                    el.extended_date, 
+                    CASE WHEN el.instance_deadline > '2099-12-31' THEN NULL ELSE el.instance_deadline END, 
+                    CASE 
+                        WHEN td.task_type IN (1, 2, 3) 
+                        THEN DATEADD(SECOND, 86399, CAST(CAST(el.created_at AS DATE) AS DATETIME)) 
+                        ELSE td.task_end_date 
+                    END
+                ) < GETDATE()
                  AND el.task_status NOT IN (3,6)
             THEN 1 ELSE 0
         END AS is_overdue,
@@ -166,11 +209,11 @@ BEGIN
       AND (@filter_task_type     IS NULL OR td.task_type     = @filter_task_type)
       AND (@filter_employee_id   IS NULL OR el.emp_id        = @filter_employee_id)
       AND (@filter_date_from     IS NULL
-           OR COALESCE(el.extended_date, td.task_end_date) >= @filter_date_from)
+           OR COALESCE(el.extended_date, el.instance_deadline, td.task_end_date) >= @filter_date_from)
       AND (@filter_date_to       IS NULL
-           OR COALESCE(el.extended_date, td.task_end_date) <= @filter_date_to)
+           OR COALESCE(el.extended_date, el.instance_deadline, td.task_end_date) <= @filter_date_to)
       AND (@filter_overdue_only  = 0
-           OR (COALESCE(el.extended_date, td.task_end_date) < GETDATE()
+           OR (COALESCE(el.extended_date, el.instance_deadline, td.task_end_date) < GETDATE()
                AND el.task_status NOT IN (3,6)))
       AND (@filter_extended_only = 0 OR el.extended_date IS NOT NULL)
       AND (@filter_search        IS NULL

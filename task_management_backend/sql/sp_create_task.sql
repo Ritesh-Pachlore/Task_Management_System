@@ -41,6 +41,8 @@ BEGIN
     -- ─────────────────────────────────────────────
     -- Combine date + time
     -- ─────────────────────────────────────────────
+    DECLARE @instance_deadline DATETIME = NULL;
+
     IF @task_type = 5  -- TIME_BOUND
     BEGIN
         SET @final_start_dt = CAST(@task_start_date AS DATETIME)
@@ -48,16 +50,22 @@ BEGIN
 
         SET @final_end_dt   = CAST(@task_end_date AS DATETIME)
                             + ISNULL(CAST(@task_end_time AS DATETIME), 0);
+        
+        SET @instance_deadline = NULL; -- Type 5 uses task_end_date logic
     END
-    ELSE IF @task_type = 1 -- DAILY
+    ELSE IF @task_type IN (1, 2, 3) -- DAILY, WEEKLY, MONTHLY
     BEGIN
         SET @final_start_dt = CAST(@task_start_date AS DATETIME);
-        SET @final_end_dt   = DATEADD(SECOND, 86399, CAST(@task_start_date AS DATETIME));
+        -- Task Life: Use @task_end_date if provided, else Infinite
+        SET @final_end_dt   = COALESCE(CAST(@task_end_date AS DATETIME), '3000-12-31 23:59:59');
+        -- Instance Life: Strict same-day deadline
+        SET @instance_deadline = DATEADD(SECOND, 86399, CAST(@task_start_date AS DATETIME));
     END
-    ELSE
+    ELSE -- RANDOM (4)
     BEGIN
         SET @final_start_dt = CAST(@task_start_date AS DATETIME);
         SET @final_end_dt   = CAST(@task_end_date   AS DATETIME);
+        SET @instance_deadline = NULL; -- Type 4 uses task_end_date logic
     END
 
     BEGIN TRY
@@ -131,13 +139,13 @@ BEGIN
             BEGIN
                 INSERT INTO task_execution_log (
                     task_id, emp_id, assigned_by, task_status,
-                    started_at, extended_date, rejection_count,
+                    started_at, extended_date, instance_deadline, rejection_count,
                     group_id, is_team_lead, is_active,
                     created_at, updated_at
                 )
                 VALUES (
                     @task_id, @emp_id, @created_by, 0,
-                    NULL, NULL, 0,
+                    NULL, NULL, @instance_deadline, 0,
                     @group_id_val,
                     CASE WHEN @assign_mode = 'GROUP' AND @emp_id = @team_lead_emp_id THEN 1 ELSE 0 END,
                     1,

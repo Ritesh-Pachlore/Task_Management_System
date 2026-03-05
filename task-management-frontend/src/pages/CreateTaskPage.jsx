@@ -123,7 +123,7 @@ const CreateTaskPage = () => {
     const toggleWeeklyDay = (dayValue) => {
         setForm(prev => ({
             ...prev,
-            weekly_days: prev.weekly_days.includes(dayValue) ? [] : [dayValue],
+            weekly_days: (prev.weekly_days || []).includes(dayValue) ? [] : [dayValue],
         }));
     };
 
@@ -469,7 +469,7 @@ const CreateTaskPage = () => {
                                     <button
                                         key={day.value}
                                         type="button"
-                                        className={`toggle-btn ${form.weekly_days.includes(day.value) ? 'toggle-btn-active' : ''}`}
+                                        className={`toggle-btn ${(form.weekly_days || []).includes(day.value) ? 'toggle-btn-active' : ''}`}
                                         style={{ padding: '6px 12px', minWidth: 'auto' }}
                                         onClick={() => toggleWeeklyDay(day.value)}
                                     >

@@ -45,14 +45,19 @@ BEGIN
         BEGIN
             UPDATE dbo.task_execution_log
             SET extended_date = @deadline,
+                instance_deadline = @deadline, -- Sync with instance_deadline
                 updated_at = GETDATE()
             WHERE id = @execution_log_id;
 
-            -- Optional: also update main task end date
-            UPDATE dbo.task_details
-            SET task_end_date = @deadline,
-                updated_at = GETDATE()
-            WHERE task_id = @task_id;
+            -- Update main task boundary ONLY if it's NOT a recurring task
+            -- For types 1, 2, 3, task_end_date is the "Task Life" (reassignment boundary)
+            UPDATE td
+            SET td.task_end_date = @deadline,
+                td.updated_at = GETDATE()
+            FROM dbo.task_details td
+            INNER JOIN dbo.task_execution_log el ON td.task_id = el.task_id
+            WHERE el.id = @execution_log_id
+              AND td.task_type NOT IN (1, 2, 3);
         END
 
         -- ✅ Handle employee assignment changes

@@ -115,10 +115,10 @@ def create_task(task_data, created_by, created_by_name="", attachments=None):
                         file
                     )
                     cursor.execute("""
-                        INSERT INTO task_attachments
-                        (task_id, file_name, file_path)
-                        VALUES (%s, %s, %s)
-                    """, [task_id, file.name, file_path])
+                        INSERT INTO task_all_attachments
+                        (task_id, file_name, file_path, uploaded_by)
+                        VALUES (%s, %s, %s, %s)
+                    """, [task_id, file.name, file_path, created_by])
 
         for eid in task_data['emp_list'].split(','):
             eid = eid.strip()
@@ -162,37 +162,24 @@ def get_tasks(emp_id, view_type, filters=None):
                 execution_log_id = task.get("execution_log_id")
                 all_attachments = []
 
-                # Manager's initial attachments
+                # Unified attachments (Manager + Employee)
                 cursor.execute("""
-                    SELECT file_name, file_path
-                    FROM task_attachments
-                    WHERE task_id = %s
-                """, [task_id])
+                    SELECT ta.file_name, ta.file_path, 
+                           s.STF_FRNAME + ' ' + s.STF_LSNAME AS uploader,
+                           CASE WHEN ta.execution_log_id IS NOT NULL THEN 1 ELSE 0 END as is_emp
+                    FROM task_all_attachments ta
+                    LEFT JOIN inout_aems..staffmst s ON s.EMP_ID = ta.uploaded_by
+                    WHERE ta.task_id = %s OR ta.execution_log_id = %s
+                    ORDER BY ta.created_at ASC
+                """, [task_id, execution_log_id])
                 rows = cursor.fetchall()
                 for row in rows:
                     all_attachments.append({
                         "file_name": row[0],
                         "file_url": settings.MEDIA_URL + row[1],
-                        "uploaded_by": "Manager"
+                        "uploaded_by": row[2] or "System",
+                        "is_employee_upload": bool(row[3])
                     })
-
-                # Employee's submitted attachments
-                if execution_log_id:
-                    cursor.execute("""
-                        SELECT ta.file_name, ta.file_path,
-                               s.STF_FRNAME + ' ' + s.STF_LSNAME AS emp_name
-                        FROM task_execution_attachments ta
-                        LEFT JOIN inout_aems..staffmst s ON s.EMP_ID = ta.uploaded_by
-                        WHERE ta.execution_log_id = %s
-                    """, [execution_log_id])
-                    exec_rows = cursor.fetchall()
-                    for row in exec_rows:
-                        all_attachments.append({
-                            "file_name": row[0],
-                            "file_url": settings.MEDIA_URL + row[1],
-                            "uploaded_by": row[2] or "Employee",
-                            "is_employee_upload": True
-                        })
 
                 task["attachments"] = all_attachments
 
@@ -217,7 +204,7 @@ def update_task_status(execution_log_id, action_type,
                         file
                     )
                     cursor.execute("""
-                        INSERT INTO task_execution_attachments
+                        INSERT INTO task_all_attachments
                         (execution_log_id, file_name, file_path, uploaded_by)
                         VALUES (%s, %s, %s, %s)
                     """, [execution_log_id, file.name, file_path, action_by])
@@ -325,6 +312,7 @@ def get_employees(emp_id, search=None):
         LEFT JOIN inout_aems..deptmst d ON s.DEP_ID = d.DEP_ID
         WHERE
             s.REP_STATUS = 1
+            AND s.INOUT_STATUS = 1
     """
     params = []
     if search:

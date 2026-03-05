@@ -18,6 +18,6 @@ BEGIN
         ISNULL(d.DEP_NAME, 'N/A') AS emp_department
     FROM inout_aems..staffmst s
     LEFT JOIN inout_aems..deptmst d ON s.DEP_ID = d.DEP_ID
-    WHERE (@exclude_emp_id IS NULL OR s.EMP_ID != @exclude_emp_id) AND s.REP_STATUS = 1
+    WHERE (@exclude_emp_id IS NULL OR s.EMP_ID != @exclude_emp_id) AND s.INOUT_STATUS = 1 AND s.REP_STATUS = 1
     ORDER BY s.STF_FRNAME;
 END

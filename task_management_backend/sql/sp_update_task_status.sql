@@ -54,6 +54,7 @@ BEGIN
                 WHEN 5 THEN 5   -- RESUBMITTED
                 WHEN 6 THEN 6   -- CANCELLED
                 WHEN 7 THEN @current_status -- EXTENDED (no status change)
+                WHEN 9 THEN 8   -- ALLOW EARLY START (sets status to 8)
                 ELSE -1
             END;
 
@@ -67,29 +68,80 @@ BEGIN
         END
 
         -- STARTED
-        IF @action_type = 1
+    IF @action_type = 1
 BEGIN
-    -- New Logic: Prevent Early Starts
-    DECLARE @task_start_date_check DATETIME;
-    SELECT @task_start_date_check = task_start_date
-    FROM task_details WHERE task_id = @task_id;
-    IF @now < @task_start_date_check
+    -- New Logic: Prevent Early Starts (Instance-aware for recurring tasks)
+    DECLARE @task_actual_start_date DATETIME;
+    DECLARE @task_type_check INT;
+    
+    SELECT @task_type_check = td.task_type,
+           @task_actual_start_date = CASE 
+                WHEN td.task_type IN (1, 2, 3) AND el.instance_deadline IS NOT NULL AND el.instance_deadline <= '2099-12-31'
+                THEN CAST(el.instance_deadline AS DATE)
+                ELSE td.task_start_date 
+           END
+    FROM task_execution_log el
+    JOIN task_details td ON el.task_id = td.task_id
+    WHERE el.id = @execution_log_id;
+    
+    -- Block if early AND not explicitly allowed by manager (status 8)
+    IF CAST(@now AS DATE) < CAST(@task_actual_start_date AS DATE) AND @current_status <> 8
     BEGIN
-        SELECT 'You cannot start this task before its planned start date.' AS message, 0 AS success,
+        SELECT 'You cannot start this task before its planned start date. Ask your manager to allow early start.' AS message, 0 AS success,
                NULL AS task_id, NULL AS emp_id, NULL AS assigned_by,
                NULL AS action_type, NULL AS new_status;
         ROLLBACK;
         RETURN;
     END
+
     UPDATE task_execution_log
-    SET task_status = @new_status,
-        started_at = CASE 
-                        WHEN started_at IS NULL THEN @now 
-                        ELSE started_at 
-                     END,
-        updated_at = @now
+    SET task_status = 1,
+        started_at  = @now,
+        updated_at  = @now
     WHERE id = @execution_log_id;
 END
+
+    -- ALLOW EARLY START (Action Type 9 -> Status 8)
+    ELSE IF @action_type = 9
+    BEGIN
+        IF @action_by <> @assigned_by
+        BEGIN
+            SELECT 'Only the task assigner can allow early start' AS message, 0 AS success,
+                   NULL AS task_id, NULL AS emp_id, NULL AS assigned_by,
+                   NULL AS action_type, NULL AS new_status;
+            ROLLBACK;
+            RETURN;
+        END
+
+        DECLARE @group_id BIGINT;
+        SELECT @group_id = group_id FROM task_execution_log WHERE id = @execution_log_id;
+
+        IF @group_id IS NOT NULL
+        BEGIN
+            -- Group task: propagate early start to ALL active members of this group
+            UPDATE task_execution_log
+            SET task_status = 8,
+                updated_at = @now
+            WHERE task_id = @task_id
+              AND group_id = @group_id
+              AND task_status = 0
+              AND is_active = 1;
+        END
+        ELSE
+        BEGIN
+            -- Individual task: update only this execution log row
+            UPDATE task_execution_log
+            SET task_status = 8,
+                updated_at = @now
+            WHERE id = @execution_log_id;
+        END
+
+        SELECT 'Early start allowed for this task' AS message, 1 AS success,
+               @task_id AS task_id, @emp_id AS emp_id, @assigned_by AS assigned_by, 9 AS action_type, 8 AS new_status;
+        
+        COMMIT;
+        RETURN;
+    END
 
         -- REJECTED
         ELSE IF @action_type = 4
@@ -116,6 +168,7 @@ END
             -- Save exactly what user selected (no auto shift)
             UPDATE task_execution_log
             SET extended_date = @extended_date,
+                instance_deadline = @extended_date, -- Sync with instance_deadline
                 updated_at = @now
             WHERE id = @execution_log_id;
         END
@@ -162,6 +215,7 @@ END
                 SET task_status = @new_status,
                     started_at = CASE WHEN @action_type = 1 AND started_at IS NULL THEN @now ELSE started_at END,
                     extended_date = CASE WHEN @action_type = 7 THEN @extended_date ELSE extended_date END,
+                    instance_deadline = CASE WHEN @action_type = 7 THEN @extended_date ELSE instance_deadline END,
                     rejection_count = CASE WHEN @action_type = 4 THEN rejection_count + 1 ELSE rejection_count END,
                     updated_at = @now
                 WHERE group_id = @group_id_val

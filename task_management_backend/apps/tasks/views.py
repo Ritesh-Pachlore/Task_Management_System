@@ -176,6 +176,10 @@ class UpdateTaskStatusView(APIView):
                 request.user.emp_name,
                 files,
             )
+            
+            if result and result[0].get('success') == 0:
+                return error_response(result[0].get('message', 'Failed to update status'))
+                
             return success_response(data=result, message="Status updated")
         except Exception as e:
             return error_response(message=str(e))
@@ -201,6 +205,10 @@ class ExtendTaskView(APIView):
                 data.get('remarks', ''),
                 request.user.emp_name,
             )
+            
+            if result and result[0].get('success') == 0:
+                return error_response(result[0].get('message', 'Failed to extend deadline'))
+                
             return success_response(data=result, message="Deadline extended")
         except Exception as e:
             return error_response(message=str(e))
@@ -318,6 +326,9 @@ class EditTaskView(APIView):
                 deadline=data.get('deadline'),
                 team_lead_emp_id=data.get('team_lead_emp_id'),  # NEW
             )
+            
+            if result and result[0].get('success') == 0:
+                return error_response(result[0].get('message', 'Failed to edit task'))
 
             return success_response(data=result, message="Task edited successfully")
         except Exception as e:

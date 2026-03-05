@@ -15,9 +15,20 @@ const GroupTaskCard = ({ members, onAction }) => {
     const status = Number(task.task_status !== undefined ? task.task_status : task.status);
     const isInfinite = task.effective_deadline && task.effective_deadline.startsWith('3000');
 
-    // Manager actions (Cancel, Extend, Approve, Reject, Edit)
+    // Calculate future start for "Allow Early Start" logic
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = new Date(task.display_start_date || task.task_start_date);
+    startDate.setHours(0, 0, 0, 0);
+    const isFutureStart = startDate > today;
+
+    // Manager actions (Cancel, Extend, Approve, Reject, Edit, Allow Early Start)
     const getActions = () => {
         const actions = [];
+        // Show 'Allow Early Start' if future-dated and not yet allowed (status != 8)
+        if (status === 0 && isFutureStart) {
+            actions.push({ type: 9, label: 'Allow Early Start', cls: 'btn-primary' });
+        }
         if (status === 2 || status === 5) {
             actions.push({ type: 3, label: 'Approve', cls: 'btn-success' });
             actions.push({ type: 4, label: 'Reject', cls: 'btn-danger' });
@@ -34,7 +45,7 @@ const GroupTaskCard = ({ members, onAction }) => {
     const editAction = allActions.find(a => a.type === 'edit');
     const otherActions = allActions.filter(a => a.type !== 'edit');
 
-    // Lead's execution log ID for history
+    // Lead's execution log ID for history and actions
     const leadLogId = members.find(m => m.is_team_lead)?.execution_log_id || task.execution_log_id;
 
     return (
