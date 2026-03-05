@@ -97,24 +97,25 @@
     border-top: 1px solid #f0f0f0;
 }
 
+/* Urgency / Due Date Colors */
 .text-danger {
     color: #F44336;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .text-due-orange {
     color: #FF9800;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .text-due-yellow {
     color: #FBC02D;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .text-due-green {
     color: #4CAF50;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .text-muted {

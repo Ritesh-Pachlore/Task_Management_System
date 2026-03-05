@@ -18,40 +18,81 @@ code {
    ═══════════════════════════════════════ */
 
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #f5f7fa;
-    color: #333;
-    font-size: 14px;
-    line-height: 1.5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f5f7fa;
+  color: #333;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 /* Scrollbar styling */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #f1f1f1; }
-::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
 
 /* Remove default button styles */
 button {
-    cursor: pointer;
-    border: none;
-    outline: none;
-    font-family: inherit;
-    font-size: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: inherit;
 }
 
-input, select, textarea {
-    font-family: inherit;
-    font-size: inherit;
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
 }
 
 a {
-    text-decoration: none;
-    color: inherit;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ═══════════════════════════════════════
+   URGENCY / DUE DATE COLORS
+   ═══════════════════════════════════════ */
+.text-danger {
+  color: #F44336 !important;
+  font-weight: 600;
+}
+
+.text-due-orange {
+  color: #FF9800 !important;
+  font-weight: 600;
+}
+
+.text-due-yellow {
+  color: #FBC02D !important;
+  font-weight: 600;
+}
+
+.text-due-green {
+  color: #4CAF50 !important;
+  font-weight: 600;
+}
+
+.text-muted {
+  color: #999 !important;
 }

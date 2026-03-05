@@ -44,12 +44,12 @@ const TaskCard = ({ task, viewType, onAction }) => {
     const diffDaysToStart = Math.ceil(Math.abs(startDate - today) / (1000 * 60 * 60 * 24));
 
     const getDueDateColor = () => {
-        if (isOverdue) return 'text-danger';
-        if (isInfinite) return 'text-muted';
-        if (days === 0) return 'text-due-orange'; // Due today
-        if (days === 1) return 'text-due-yellow'; // 1 day left
-        if (days >= 2) return 'text-due-green';   // 2+ days left
-        return 'text-muted';
+        if (days === 0) return '#FF9800'; // Orange
+        if (isOverdue || days < 0) return '#F44336'; // Red
+        if (isInfinite) return '#999';
+        if (days === 1) return '#FBC02D'; // Yellow
+        if (days >= 2) return '#4CAF50';   // Green
+        return '#999';
     };
 
     const getActions = () => {
@@ -98,7 +98,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
 
     return (
         <div
-            className={`task - card ${isOverdue ? 'task-card-overdue' : ''} `}
+            className={`task-card ${isOverdue ? 'task-card-overdue' : ''}`}
         >
             <div className="task-card-top">
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -107,7 +107,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                         <StatusBadge status={status} />
                         {task.extended_date && <span className="task-extended-tag">Extended</span>}
                         {task.group_id && (
-                            <span className={`task - group - badge ${task.is_team_lead ? 'lead' : 'member'} `} style={{
+                            <span className={`task-group-badge ${task.is_team_lead ? 'lead' : 'member'}`} style={{
                                 fontSize: '12px',
                                 padding: '4px 10px',
                                 borderRadius: '6px',
@@ -117,7 +117,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                                 gap: '6px',
                                 background: task.is_team_lead ? '#e3f2fd' : '#f8f9fa',
                                 color: task.is_team_lead ? '#0d47a1' : '#616161',
-                                border: `1px solid ${task.is_team_lead ? '#90caf9' : '#eeeeee'} `,
+                                border: `1px solid ${task.is_team_lead ? '#90caf9' : '#eeeeee'}`,
                                 boxShadow: task.is_team_lead ? '0 2px 4px rgba(13, 71, 161, 0.1)' : 'none',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.3px'
@@ -234,7 +234,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                 </div>
                 <div className="task-meta-item">
                     <MdAccessTime />
-                    <span>
+                    <span style={{ color: getDueDateColor(), fontWeight: 600 }}>
                         {task.task_type === 1
                             ? `Daily Task${!isInfinite ? ' | Due: ' + formatDate(task.display_end_date) : ''} `
                             : task.task_type === 2
@@ -245,7 +245,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                         }
                         {/* // Display "Starts in X days" */}
                         {!isInfinite && daysText && !isFutureStart && (
-                            <span className={getDueDateColor()}>
+                            <span style={{ fontWeight: 600 }}>
                                 {' '}({daysText})
                             </span>
                         )}
@@ -263,7 +263,7 @@ const TaskCard = ({ task, viewType, onAction }) => {
                     {otherActions.map((action, idx) => (
                         <button
                             key={idx}
-                            className={`btn btn - sm ${action.cls} `}
+                            className={`btn btn-sm ${action.cls}`}
                             onClick={(e) => { e.stopPropagation(); onAction(task, action.type); }}
                         >
                             {action.label}

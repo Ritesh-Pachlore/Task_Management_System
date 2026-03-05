@@ -105,47 +105,57 @@ BEGIN
             -- 2. WEEKLY
             ELSE IF @recurrence_type IN ('2', 'WEEKLY')
             BEGIN
-                DECLARE @check_day INT = 0;
-                WHILE @check_day < 7
+                -- NEW LOGIC: Look forward to see if today is the "Designated Working Day" 
+                -- for a scheduled day that happens on a holiday.
+                DECLARE @day_offset INT = 0;
+                WHILE @day_offset < 7
                 BEGIN
-                    DECLARE @candidate_date DATE = DATEADD(DAY, -@check_day, @target_date);
-                    DECLARE @candidate_day_name VARCHAR(20) = DATENAME(WEEKDAY, @candidate_date);
+                    DECLARE @scheduled_date DATE = DATEADD(DAY, @day_offset, @target_date);
+                    DECLARE @scheduled_day_name VARCHAR(20) = DATENAME(WEEKDAY, @scheduled_date);
                     
-                    IF @weekly_days IS NOT NULL AND CHARINDEX(@candidate_day_name, @weekly_days) > 0
+                    -- Is this date (@scheduled_date) one of the target days?
+                    IF @weekly_days IS NOT NULL AND CHARINDEX(@scheduled_day_name, @weekly_days) > 0
                     BEGIN
-                        IF @check_day = 0 AND dbo.fn_is_non_working_day(@target_date, @ref_emp_id) = 0
-                            SET @should_create = 1;
-                        ELSE IF @check_day > 0
+                        -- If scheduled_date is a working day, it MUST be assigned ON scheduled_date
+                        IF dbo.fn_is_non_working_day(@scheduled_date, @ref_emp_id) = 0
                         BEGIN
-                            IF dbo.fn_is_non_working_day(@candidate_date, @ref_emp_id) = 1
-                                AND @target_date = dbo.fn_get_next_working_day(@candidate_date, @ref_emp_id)
+                            IF @day_offset = 0 SET @should_create = 1;
+                        END
+                        -- If scheduled_date IS a holiday, find the EARLIER working day
+                        ELSE
+                        BEGIN
+                            -- Today is the designated day if Today is working AND all days between Today and Scheduled are holidays
+                            IF dbo.fn_is_non_working_day(@target_date, @ref_emp_id) = 0
+                                AND @target_date = dbo.fn_get_previous_working_day(@scheduled_date, @ref_emp_id)
                                 SET @should_create = 1;
                         END
-                        BREAK;
+                        
+                        IF @should_create = 1 BREAK;
                     END
-                    SET @check_day = @check_day + 1;
+                    SET @day_offset = @day_offset + 1;
                 END
             END
 
             -- 3. MONTHLY
             ELSE IF @recurrence_type IN ('3', 'MONTHLY')
             BEGIN
-                DECLARE @scheduled_day INT = @monthly_day;
+                DECLARE @scheduled_day_num INT = @monthly_day;
                 DECLARE @days_in_month INT = DAY(EOMONTH(@target_date));
-                IF @scheduled_day > @days_in_month SET @scheduled_day = @days_in_month;
+                IF @scheduled_day_num > @days_in_month SET @scheduled_day_num = @days_in_month;
                 
-                DECLARE @scheduled_date DATE = DATEFROMPARTS(YEAR(@target_date), MONTH(@target_date), @scheduled_day);
+                DECLARE @scheduled_date_m DATE = DATEFROMPARTS(YEAR(@target_date), MONTH(@target_date), @scheduled_day_num);
                 
-                IF @target_date = @scheduled_date
+                -- IF scheduled date is working day, assign ON that day
+                IF dbo.fn_is_non_working_day(@scheduled_date_m, @ref_emp_id) = 0
+                BEGIN
+                    IF @target_date = @scheduled_date_m SET @should_create = 1;
+                END
+                -- IF scheduled date is holiday, find the EARLIER working day
+                ELSE
                 BEGIN
                     IF dbo.fn_is_non_working_day(@target_date, @ref_emp_id) = 0
+                        AND @target_date = dbo.fn_get_previous_working_day(@scheduled_date_m, @ref_emp_id)
                         SET @should_create = 1;
-                END
-                ELSE IF @scheduled_date < @target_date
-                   AND dbo.fn_is_non_working_day(@scheduled_date, @ref_emp_id) = 1
-                   AND @target_date = dbo.fn_get_next_working_day(@scheduled_date, @ref_emp_id)
-                BEGIN
-                    SET @should_create = 1;
                 END
             END
 
@@ -198,6 +208,19 @@ BEGIN
 
         FETCH NEXT FROM pattern_cursor INTO @task_id, @recurrence_type, @weekly_days, @monthly_day, @created_by, @task_start_date;
     END
+
+    -- ── 4. PROACTIVE SHIFT ──────────────────────────────────────
+    -- If a holiday was declared AFTER an instance was created but 
+    -- BEFORE it is due, move it to the earlier working day.
+    UPDATE tel
+    SET instance_deadline = DATEADD(SECOND, 86399, CAST(dbo.fn_get_previous_working_day(CAST(tel.instance_deadline AS DATE), tel.emp_id) AS DATETIME)),
+        updated_at = @now
+    FROM task_execution_log tel
+    INNER JOIN task_details td ON tel.task_id = td.task_id
+    WHERE td.task_type IN (2, 3) -- WEEKLY, MONTHLY
+      AND tel.task_status = 0 -- Pending
+      AND CAST(tel.instance_deadline AS DATE) > @target_date -- Future tasks
+      AND dbo.fn_is_non_working_day(CAST(tel.instance_deadline AS DATE), tel.emp_id) = 1;
 
     CLOSE pattern_cursor;
     DEALLOCATE pattern_cursor;

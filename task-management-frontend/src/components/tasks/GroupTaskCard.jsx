@@ -3,7 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../common/StatusBadge';
 import PriorityBadge from '../common/PriorityBadge';
-import { formatDate } from '../../utils/formatters';
+import { formatDate, getDaysText } from '../../utils/formatters';
 import { MdAccessTime, MdGroups, MdHistory } from 'react-icons/md';
 import { API_BASE_URL } from '../../api/axios';
 import './TaskCard.css';
@@ -21,6 +21,19 @@ const GroupTaskCard = ({ members, onAction }) => {
     const startDate = new Date(task.display_start_date || task.task_start_date);
     startDate.setHours(0, 0, 0, 0);
     const isFutureStart = startDate > today;
+
+    const days = task.days_remaining;
+    const isOverdue = (task.is_overdue === 1 || task.is_overdue === true) && ![3, 6].includes(status);
+    const daysText = getDaysText(days);
+
+    const getDueDateColor = () => {
+        if (days === 0) return '#FF9800'; // Orange
+        if (isOverdue || days < 0) return '#F44336'; // Red
+        if (isInfinite) return '#999';
+        if (days === 1) return '#FBC02D'; // Yellow
+        if (days >= 2) return '#4CAF50';   // Green
+        return '#999';
+    };
 
     // Manager actions (Cancel, Extend, Approve, Reject, Edit, Allow Early Start)
     const getActions = () => {
@@ -109,8 +122,13 @@ const GroupTaskCard = ({ members, onAction }) => {
             <div className="task-card-meta">
                 <div className="task-meta-item">
                     <MdAccessTime />
-                    <span>
+                    <span style={{ color: getDueDateColor(), fontWeight: 600 }}>
                         Due: {isInfinite ? 'No Deadline' : formatDate(task.effective_deadline)}
+                        {!isInfinite && daysText && !isFutureStart && (
+                            <span style={{ fontWeight: 700 }}>
+                                {' '}({daysText})
+                            </span>
+                        )}
                     </span>
                 </div>
             </div>

@@ -58,8 +58,23 @@ BEGIN
         SET @final_start_dt = CAST(@task_start_date AS DATETIME);
         -- Task Life: Use @task_end_date if provided, else Infinite
         SET @final_end_dt   = COALESCE(CAST(@task_end_date AS DATETIME), '3000-12-31 23:59:59');
-        -- Instance Life: Strict same-day deadline
-        SET @instance_deadline = DATEADD(SECOND, 86399, CAST(@task_start_date AS DATETIME));
+        
+        -- Instance Life: Strict same-day deadline, but shift Weekly/Monthly if start date is holiday
+        DECLARE @calc_inst_date DATE = @task_start_date;
+        IF @task_type IN (2, 3) -- WEEKLY, MONTHLY
+        BEGIN
+            -- Using team_lead_emp_id as reference for holiday check if it exists
+            DECLARE @ref_id BIGINT = @team_lead_emp_id;
+            IF @ref_id IS NULL AND @emp_list IS NOT NULL
+            BEGIN
+                SELECT TOP 1 @ref_id = CAST(TRIM(value) AS BIGINT) FROM STRING_SPLIT(@emp_list, ',') WHERE TRIM(value) <> '';
+            END
+
+            IF dbo.fn_is_non_working_day(@calc_inst_date, @ref_id) = 1
+                SET @calc_inst_date = dbo.fn_get_previous_working_day(@calc_inst_date, @ref_id);
+        END
+
+        SET @instance_deadline = DATEADD(SECOND, 86399, CAST(@calc_inst_date AS DATETIME));
     END
     ELSE -- RANDOM (4)
     BEGIN

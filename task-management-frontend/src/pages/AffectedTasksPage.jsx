@@ -127,7 +127,11 @@ const AffectedTasksPage = () => {
                                 <p>👤 {task.emp_name}</p>
                                 <p>
                                     📅 Current:{' '}
-                                    <strong>
+                                    <strong className={
+                                        task.days_until_deadline < 0 ? 'text-danger' :
+                                            task.days_until_deadline === 0 ? 'text-due-orange' :
+                                                task.days_until_deadline === 1 ? 'text-due-yellow' : 'text-due-green'
+                                    }>
                                         {formatDateWithDay(task.current_deadline)}
                                     </strong>
                                     {' '}({task.reason})
@@ -139,8 +143,14 @@ const AffectedTasksPage = () => {
                                     </strong>
                                 </p>
                                 {task.days_until_deadline !== null && (
-                                    <p>
-                                        ⏰ {task.days_until_deadline} days until deadline
+                                    <p className={
+                                        task.days_until_deadline < 0 ? 'text-danger' :
+                                            task.days_until_deadline === 0 ? 'text-due-orange' :
+                                                task.days_until_deadline === 1 ? 'text-due-yellow' : 'text-due-green'
+                                    }>
+                                        ⏰ {task.days_until_deadline === 0 ? 'Due today' :
+                                            task.days_until_deadline < 0 ? `${Math.abs(task.days_until_deadline)} days overdue` :
+                                                `${task.days_until_deadline} days until deadline`}
                                     </p>
                                 )}
                             </div>

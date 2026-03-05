@@ -90,6 +90,34 @@ GO
 
 
 -- ====================================================
+-- Function 3: Get previous working day (Emp-aware)
+-- ====================================================
+IF EXISTS (SELECT * FROM sys.objects WHERE name = 'fn_get_previous_working_day')
+    DROP FUNCTION fn_get_previous_working_day;
+GO
+
+CREATE FUNCTION [dbo].[fn_get_previous_working_day](@check_date DATE, @emp_id BIGINT = NULL)
+RETURNS DATE
+AS
+BEGIN
+    DECLARE @result DATE = DATEADD(DAY, -1, @check_date);
+    DECLARE @safety INT = 0;
+
+    WHILE dbo.fn_is_non_working_day(@result, @emp_id) = 1 AND @safety < 10
+    BEGIN
+        SET @result = DATEADD(DAY, -1, @result);
+        SET @safety = @safety + 1;
+    END
+
+    RETURN @result;
+END
+GO
+
+PRINT '  ✅ fn_get_previous_working_day CREATED (Emp-aware)';
+GO
+
+
+-- ====================================================
 -- TEST
 -- ====================================================
 SELECT 'Sunday Jul 6' AS test,

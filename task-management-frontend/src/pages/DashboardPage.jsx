@@ -578,9 +578,12 @@ const DashboardPage = () => {
                                                                     {formatDate(task.display_end_date)}
                                                                 </td>
                                                                 <td style={{
-                                                                    color: currentStatus === 3 ? '#4CAF50' : (isOverdue ? '#f44336' : '#999'),
-                                                                    fontWeight: currentStatus === 3 || isOverdue ? 600 : 400,
-                                                                    borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee'
+                                                                    borderTop: isGroup && isFirstInGroup ? '2px solid #4361ee' : '1px solid #eee',
+                                                                    color: currentStatus === 3 ? '#4CAF50' :
+                                                                        (task.days_remaining === 0 ? '#FF9800' :
+                                                                            (isOverdue || task.days_remaining < 0 ? '#F44336' :
+                                                                                (task.days_remaining === 1 ? '#FBC02D' : '#4CAF50'))),
+                                                                    fontWeight: 600
                                                                 }}>
                                                                     {currentStatus === 3 ? 'Completed' : (getDaysText(task.days_remaining) || '-')}
                                                                 </td>
@@ -703,10 +706,7 @@ const DashboardPage = () => {
                                             <td style={{ color: '#FF9800' }}>
                                                 {emp.pending}
                                             </td>
-                                            <td style={{
-                                                color: emp.overdue > 0
-                                                    ? '#F44336' : '#999',
-                                            }}>
+                                            <td className={emp.overdue > 0 ? 'text-danger' : 'text-muted'}>
                                                 {emp.overdue}
                                             </td>
                                             <td>{emp.rejected}</td>
