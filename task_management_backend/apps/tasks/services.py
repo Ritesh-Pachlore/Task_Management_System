@@ -12,9 +12,12 @@ from .notifications import (
     notify_status_changed,
     notify_task_extended,
 )
+from django.db import connection
+from django.core.files.storage import default_storage
+from django.conf import settings
 
 
-def create_task(task_data, created_by, created_by_name=""):
+def create_task(task_data, created_by, created_by_name="",attachments=None):
     """
     Create task.
 
@@ -46,42 +49,97 @@ def create_task(task_data, created_by, created_by_name=""):
 
     task_type = int(task_data['task_type'])
 
+    # ── Recurrence Field Mapping ────────────────────────────────
+    recurrence_type = None
+    recurrence_end_date = None
+    weekly_days = '0'
+    monthly_day_of_month = 0
+
+    if task_type in [TaskType.DAILY, TaskType.WEEKLY, TaskType.MONTHLY]:
+        # recurrence_type now maps to numeric IDs: 1(Daily), 2(Weekly), 3(Monthly)
+        recurrence_type = task_data.get('recurrence_type')
+        if not recurrence_type:
+            recurrence_type = str(task_type)
+            
+        recurrence_end_date = task_data.get('recurrence_end_date')
+        if not recurrence_end_date or recurrence_end_date == '':
+            recurrence_end_date = '3000-12-31'
+        
+        if task_type == TaskType.DAILY:
+            weekly_days = '0'
+            monthly_day_of_month = 0
+            if not task_data.get('task_start_date'):
+                from datetime import date
+                task_data['task_start_date'] = date.today().isoformat()
+        elif task_type == TaskType.WEEKLY:
+            weekly_days = task_data.get('weekly_days') or '0'
+            monthly_day_of_month = 0
+        elif task_type == TaskType.MONTHLY:
+            weekly_days = '0'
+            # Derive from start_date if not explicitly provided
+            monthly_day_of_month = task_data.get('monthly_day_of_month')
+            if not monthly_day_of_month and task_data.get('task_start_date'):
+                try:
+                    from datetime import datetime
+                    dt = datetime.strptime(task_data['task_start_date'], '%Y-%m-%d')
+                    monthly_day_of_month = dt.day
+                except:
+                    monthly_day_of_month = 0
+            monthly_day_of_month = monthly_day_of_month or 0
+
+    # ── Default end date for non-recurrent (Random/Time) ────────
+    if not task_data.get('task_end_date'):
+        task_data['task_end_date'] = task_data.get('task_start_date')
+
     # ── Extract time fields (only meaningful for TIME_BOUND) ─────
-    # Service passes them to SP regardless of task_type.
-    # SP internally nullifies if not TIME_BOUND — double safety.
     if task_type == TaskType.TIME_BOUND:
         start_time = task_data.get('start_time') or None
         end_time   = task_data.get('end_time')   or None
     else:
-        # Force None for all non-TIME_BOUND types
         start_time = None
         end_time   = None
-
-    # ── FUTURE: when DAILY/WEEKLY/MONTHLY are implemented ────────
-    # if task_type == TaskType.DAILY:
-    #     start_time = None   (no time for daily)
-    #     end_time   = None
-    # if task_type == TaskType.WEEKLY:
-    #     weekly_day = task_data.get('day_of_week')
-    # if task_type == TaskType.MONTHLY:
-    #     start_time = None
-    #     end_time   = None
-    # ─────────────────────────────────────────────────────────────
 
     result = call_sp('sp_create_task', [
         task_data['task_title'],
         task_data.get('task_description', ''),
         task_type,
         int(task_data['priority_type']),
-        task_data['task_start_date'],    # DATE string  e.g. "2025-07-15"
-        start_time,                      # TIME string  e.g. "09:00" or None
-        task_data['task_end_date'],      # DATE string  e.g. "2025-07-15"
-        end_time,                        # TIME string  e.g. "09:30" or None
+        task_data['task_start_date'],    # DATE string 
+        start_time,                      # TIME string or None
+        task_data['task_end_date'],      # DATE string
+        end_time,                        # TIME string or None
         created_by,
         task_data['emp_list'],
+        # New Recurrence params
+        recurrence_type,
+        recurrence_end_date,
+        weekly_days,
+        monthly_day_of_month,
     ])
 
     if result and result[0].get('success') == 1:
+
+                # 🔥 GET CREATED TASK ID FROM SP RESULT
+        task_id = result[0].get('task_id')
+
+        # 🔥 SAVE ATTACHMENTS IF PRESENT
+        # attachments = task_data.get('attachments')
+
+        if attachments and task_id:
+            with connection.cursor() as cursor:
+                for file in attachments:
+                    
+                    file_path = default_storage.save(
+                        f"task_attachments/{file.name}",
+                        file
+                    )
+
+                    cursor.execute("""
+                        INSERT INTO task_attachments
+                        (task_id, file_name, file_path)
+                        VALUES (%s, %s, %s)
+                    """, [task_id, file.name, file_path])
+
         for eid in task_data['emp_list'].split(','):
             eid = eid.strip()
             if eid:
@@ -94,9 +152,15 @@ def create_task(task_data, created_by, created_by_name=""):
     return result
 
 
+from django.conf import settings
+from django.db import connection
+
+
 def get_tasks(emp_id, view_type, filters=None):
+
+    # 🔹 Step 1: Call SP and store result
     if filters:
-        return call_sp('sp_fetch_task_list', [
+        tasks = call_sp('sp_fetch_task_list', [
             emp_id,
             view_type,
             filters.get('status'),
@@ -109,26 +173,91 @@ def get_tasks(emp_id, view_type, filters=None):
             1 if filters.get('extended_only') else 0,
             filters.get('search'),
         ])
-    return call_sp('sp_fetch_task_list', [
-        emp_id, view_type,
-        None, None, None, None, None, None, 0, 0, None,
-    ])
+    else:
+        tasks = call_sp('sp_fetch_task_list', [
+            emp_id, view_type,
+            None, None, None, None, None, None, 0, 0, None,
+        ])
+
+    # 🔹 Step 2: Attach files to each task
+    if tasks:
+        with connection.cursor() as cursor:
+            for task in tasks:
+
+                task_id = task.get("task_id")
+                execution_log_id = task.get("execution_log_id")
+
+                all_attachments = []
+
+                # Get manager's initial attachments
+                cursor.execute("""
+                    SELECT file_name, file_path
+                    FROM task_attachments
+                    WHERE task_id = %s
+                """, [task_id])
+
+                rows = cursor.fetchall()
+                for row in rows:
+                    all_attachments.append({
+                        "file_name": row[0],
+                        "file_url": settings.MEDIA_URL + row[1],
+                        "uploaded_by": "Manager"
+                    })
+
+                # Get employee's submitted attachments
+                if execution_log_id:
+                    cursor.execute("""
+                        SELECT ta.file_name, ta.file_path, s.STF_FRNAME + ' ' + s.STF_LSNAME AS emp_name
+                        FROM task_execution_attachments ta
+                        LEFT JOIN inout_aems..staffmst s ON s.EMP_ID = ta.uploaded_by
+                        WHERE ta.execution_log_id = %s
+                    """, [execution_log_id])
+                    
+                    exec_rows = cursor.fetchall()
+                    for row in exec_rows:
+                        all_attachments.append({
+                            "file_name": row[0],
+                            "file_url": settings.MEDIA_URL + row[1],
+                            "uploaded_by": row[2] or "Employee",
+                            "is_employee_upload": True
+                        })
+
+                task["attachments"] = all_attachments
+
+    # 🔹 Step 3: Return modified result
+    return tasks
 
 
 def update_task_status(execution_log_id, action_type,
-                       action_by, remarks, action_by_name=""):
+                       action_by, remarks, action_by_name="", attachments=None):
     result = call_sp('sp_update_task_status', [
         execution_log_id, action_type, action_by, remarks, None,
     ])
     if result and result[0].get('success') == 1:
         info        = result[0]
         status_name = ActionType.CHOICES.get(action_type, 'UNKNOWN')
+        task_id     = info.get('task_id')
+        
+        # 🔥 SAVE ATTACHMENTS IF PRESENT TO THE NEW TABLE
+        if attachments and execution_log_id:
+            with connection.cursor() as cursor:
+                for file in attachments:
+                    file_path = default_storage.save(
+                        f"task_attachments/{file.name}",
+                        file
+                    )
+                    cursor.execute("""
+                        INSERT INTO task_execution_attachments
+                        (execution_log_id, file_name, file_path, uploaded_by)
+                        VALUES (%s, %s, %s, %s)
+                    """, [execution_log_id, file.name, file_path, action_by])
+                    
         if action_type in [1, 2, 5]:
             notify_status_changed(
                 info.get('assigned_by'), remarks,
                 status_name, action_by_name,
             )
-        elif action_type in [3, 4, 6, 7]:
+        elif action_type in [3, 4, 6, 7, 8]:
             notify_status_changed(
                 info.get('emp_id'), remarks,
                 status_name, action_by_name,
@@ -162,10 +291,34 @@ def get_task_history(execution_log_id):
 def get_dashboard_counts(emp_id, view_type, date_from=None, date_to=None, employee_id=None):
     results = call_sp_multiple_results(
         'sp_dashboard_counts', [emp_id, view_type, date_from, date_to, employee_id])
+    overall = results[0][0] if len(results) > 0 and results[0] else {}
+    employee_summary = results[1] if len(results) > 1 and results[1] else []
+
+    # Enrich employee_summary: if department is missing or 'N/A', try a direct lookup
+    if employee_summary:
+        for emp in employee_summary:
+            dep = emp.get('emp_department') if emp else None
+            if not dep or dep == 'N/A':
+                try:
+                    q = """
+                        SELECT d.DEP_NAME AS dep_name
+                        FROM inout_aems..staffmst s
+                        LEFT JOIN inout_aems..deptmst d ON s.DEP_ID = d.DEP_ID
+                        WHERE s.EMP_ID = %s
+                    """
+                    res = run_query(q, [emp.get('emp_id')])
+                    if res and res[0].get('dep_name'):
+                        emp['emp_department'] = res[0]['dep_name']
+                    else:
+                        emp['emp_department'] = None
+                except Exception:
+                    # best-effort: leave as-is if lookup fails
+                    pass
+
     return {
         "view_type":        view_type,
-        "overall_counts":   results[0][0] if len(results) > 0 and results[0] else {},
-        "employee_summary": results[1]    if len(results) > 1 and results[1] else [],
+        "overall_counts":   overall,
+        "employee_summary": employee_summary,
         "status_chart":     results[2]    if len(results) > 2 and results[2] else [],
         "priority_chart":   results[3]    if len(results) > 3 and results[3] else [],
         "monthly_trend":    results[4]    if len(results) > 4 and results[4] else [],
@@ -178,21 +331,29 @@ def get_affected_tasks(emp_id, view_type):
 
 
 def get_employees(emp_id, search=None):
+    query = """
+        SELECT
+            s.EMP_ID AS emp_id,
+            s.STF_FRNAME + ' ' + s.STF_LSNAME AS emp_name,
+            ISNULL(d.DEP_NAME, 'N/A') AS emp_department
+        FROM inout_aems..staffmst s
+        LEFT JOIN inout_aems..deptmst d ON s.DEP_ID = d.DEP_ID
+        WHERE
+            s.REP_STATUS = 1
+    """
+
+    params = []
+
     if search:
-        return run_query(
-            """
-            SELECT
-                EMP_ID AS emp_id,
-                STF_FRNAME + ' ' + STF_LSNAME AS emp_name
-            FROM inout_aems..staffmst
-           WHERE
-                REP_STATUS = 1                             
-                AND (
-                    CAST(EMP_ID AS NVARCHAR(20)) LIKE %s
-                    OR STF_FRNAME + ' ' + STF_LSNAME LIKE %s
-                )
-            ORDER BY STF_FRNAME, STF_LSNAME
-            """,
-            [f'%{search}%', f'%{search}%']
-        )
-    return call_sp('sp_get_employees', [emp_id])
+        query += """
+            AND (
+                CAST(s.EMP_ID AS NVARCHAR(20)) LIKE %s
+                OR s.STF_FRNAME + ' ' + s.STF_LSNAME LIKE %s
+                OR d.DEP_NAME LIKE %s
+            )
+        """
+        params = [f'%{search}%', f'%{search}%', f'%{search}%']
+
+    query += " ORDER BY s.STF_FRNAME, s.STF_LSNAME"
+
+    return run_query(query, params)

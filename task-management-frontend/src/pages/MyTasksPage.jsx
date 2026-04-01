@@ -46,13 +46,28 @@ const MyTasksPage = () => {
         });
     };
 
-    const submitAction = async ({ remarks }) => {
+    const submitAction = async (payload, isFormData = false) => {
         try {
-            const response = await api.post('/tasks/update-status/', {
-                execution_log_id: actionModal.task.execution_log_id,
-                action_type: actionModal.actionType,
-                remarks,
-            });
+            let dataToSend;
+            let config = {};
+
+            if (isFormData) {
+                dataToSend = payload; // It's already FormData
+                dataToSend.append('execution_log_id', actionModal.task.execution_log_id);
+                dataToSend.append('action_type', actionModal.actionType);
+                config = {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                };
+            } else {
+                dataToSend = {
+                    ...payload,
+                    execution_log_id: actionModal.task.execution_log_id,
+                    action_type: actionModal.actionType,
+                };
+            }
+
+            const response = await api.post('/tasks/update-status/', dataToSend, config);
+
             if (response.data.success) {
                 toast.success('Status updated!');
                 setActionModal(null);
@@ -71,7 +86,7 @@ const MyTasksPage = () => {
                 <h1>My Tasks</h1>
             </div>
 
-            <TaskFilters filters={filters} setFilters={setFilters} />
+            <TaskFilters filters={filters} setFilters={setFilters} showDateFilter={true} />
 
             {loading ? (
                 <div className="loading-container"><div className="spinner" /></div>
@@ -96,6 +111,7 @@ const MyTasksPage = () => {
                     title={actionModal.title}
                     onSubmit={submitAction}
                     onClose={() => setActionModal(null)}
+                    actionModal={actionModal}
                 />
             )}
         </div>

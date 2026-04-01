@@ -7,10 +7,11 @@ GET /api/auth/employees/ → Employee list from staffmst
 """
 
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.decorators import authentication_classes
 from utils.db_helper import call_sp, run_query
 from utils.response_handler import success_response, error_response
-from .token_auth import generate_token
+from .token_auth import generate_token, StandaloneTokenAuthentication
 from apps.tasks.services import get_employees
 
 class DevTokenView(APIView):
@@ -60,7 +61,8 @@ class DevTokenView(APIView):
 
             if not result:
                 return error_response(
-                    f"Employee ID {emp_id} not found in staffmst."
+                    f"Employee ID {emp_id} not found in staffmst. "
+                    "Please check your employee ID."
                 )
 
             user_data = result[0]
@@ -75,6 +77,7 @@ class DevTokenView(APIView):
                     "token": token,
                     "user": {
                         "emp_id": user_data['emp_id'],
+                        "emp_name": user_data['full_name'],
                         "full_name": user_data['full_name'],
                         "first_name": user_data['first_name'],
                         "last_name": user_data['last_name'],
@@ -83,14 +86,20 @@ class DevTokenView(APIView):
                 message="Dev token generated for " + user_data['full_name']
             )
 
-        except ValueError:
-            return error_response("emp_id must be a number")
+        except ValueError as ve:
+            return error_response(f"Invalid employee ID format: {str(ve)}")
         except Exception as e:
-            return error_response(message=str(e))
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Token Error: {error_details}")
+            return error_response(f"Server error: {str(e)}")
 
 
+@authentication_classes([StandaloneTokenAuthentication])
 class MeView(APIView):
     """GET /api/auth/me/ — Current user info from token"""
+    authentication_classes = [StandaloneTokenAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         return success_response(
@@ -101,6 +110,7 @@ class MeView(APIView):
         )
 
 
+@authentication_classes([StandaloneTokenAuthentication])
 class EmployeeListView(APIView):
     """
     GET /api/auth/employees/              → All employees
@@ -109,8 +119,8 @@ class EmployeeListView(APIView):
     
     Single search input works for BOTH ID and Name.
     """
-
-
+    authentication_classes = [StandaloneTokenAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:

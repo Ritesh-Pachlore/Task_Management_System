@@ -8,6 +8,9 @@ Django Settings — STANDALONE MODE
 """
 
 from pathlib import Path
+import os   
+
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -33,6 +36,7 @@ INSTALLED_APPS = [
     'corsheaders',             # CORS for React
     'apps.authentication',     # Our auth app
     'apps.tasks',              # Our tasks app
+    # 'django_apscheduler',      # Scheduler — tables fixed via fix_apscheduler_tables.sql
 ]
 
 
@@ -82,7 +86,7 @@ REST_FRAMEWORK = {
         'apps.authentication.token_auth.StandaloneTokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ],
 }
 
@@ -95,12 +99,27 @@ JWT_SECRET_KEY = "standalone-task-mgmt-secret-key-2025"
 JWT_EXPIRATION_HOURS = 24    # Token valid for 24 hours
 
 
+# ASGI_APPLICATION = 'config.asgi.application'
+# CHANNEL_LAYERS = {
+#     'default': {'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#                 'CONFIG': {"hosts": [('127.0.0.1', 6379)]}},
+# }
+
+
+
 # ════════════════════════════════════════
 # OTHER SETTINGS
 # ════════════════════════════════════════
 ROOT_URLCONF = 'config.urls'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 STATIC_URL = 'static/'
+
+# ════════════════════════════════════════
+# MEDIA FILES (For Task Attachments)
+# ════════════════════════════════════════
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Kolkata'
 USE_TZ = False   # We use SQL Server's GETDATE()
@@ -146,11 +165,7 @@ TEMPLATES = [
 #     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
 # }
 # SHARED_SECRET_KEY = "your-shared-secret-key-must-match-java"  # ⚠️ CHANGE
-# ASGI_APPLICATION = 'config.asgi.application'
-# CHANNEL_LAYERS = {
-#     'default': {'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#                 'CONFIG': {"hosts": [('127.0.0.1', 6379)]}},
-# }
+
 # ROOT_URLCONF = 'config.urls'
 # DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # STATIC_URL = 'static/'

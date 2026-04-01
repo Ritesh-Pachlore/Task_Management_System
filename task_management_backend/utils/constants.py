@@ -8,14 +8,10 @@ class TaskType:
 
 
  # Active types (shown in UI)
-    ACTIVE_TYPES = [4, 5]
-
-    # Future types (UI placeholder only)
-    # FUTURE_TYPES = [1, 2, 3]
+    ACTIVE_TYPES = [1, 2, 3, 4, 5]
 
     # Types where end_date is required
-    REQUIRES_END_DATE = [5]
-    # Future: [1, 2, 3, 5]
+    REQUIRES_END_DATE = [1, 2, 3, 5]
 
     # Only TIME_BOUND stores actual times in datetime fields
     REQUIRES_TIME = [5]
@@ -37,6 +33,7 @@ class TaskStatus:
     RESUBMITTED = 5
     CANCELLED = 6
     ON_HOLD = 7
+    
     CHOICES = {0:"ASSIGNED",1:"STARTED",2:"SUBMITTED",3:"APPROVED",
                4:"REJECTED",5:"RESUBMITTED",6:"CANCELLED",7:"ON_HOLD"}
     
@@ -49,10 +46,10 @@ class ActionType:
     REJECTED = 4
     RESUBMITTED = 5
     CANCELLED = 6
-    ON_HOLD = 7
-    EXTENDED = 8
+    EXTENDED = 7
+    ON_HOLD = 8
     CHOICES = {0:"ASSIGNED",1:"STARTED",2:"SUBMITTED",3:"APPROVED",
-               4:"REJECTED",5:"RESUBMITTED",6:"CANCELLED",7:"ON_HOLD",8:"EXTENDED"}
+               4:"REJECTED",5:"RESUBMITTED",6:"CANCELLED",7:"EXTENDED",8:"ON_HOLD"}
     
 
 class ViewType:

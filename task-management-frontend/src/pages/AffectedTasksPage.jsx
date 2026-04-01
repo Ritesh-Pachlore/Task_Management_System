@@ -10,8 +10,8 @@ import { formatDate } from '../utils/formatters';
 import { MdWarning } from 'react-icons/md';
 
 const AffectedTasksPage = () => {
-    const [tasks,    setTasks]    = useState([]);
-    const [loading,  setLoading]  = useState(true);
+    const [tasks, setTasks] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [viewType, setViewType] = useState('ASSIGNED_BY_ME');
 
     // ← wrap with useCallback so useEffect dependency is stable
@@ -38,7 +38,7 @@ const AffectedTasksPage = () => {
         try {
             const response = await api.post('/tasks/extend/', {
                 execution_log_id: task.execution_log_id,
-                extended_date:    task.suggested_date,
+                extended_date: task.suggested_date,
                 remarks: `Shifted from ${task.reason} (${formatDate(task.current_deadline)})`,
             });
             if (response.data.success) {
@@ -145,22 +145,35 @@ const AffectedTasksPage = () => {
                                 )}
                             </div>
 
-                            <div className="btn-group">
-                                <button
-                                    className="btn btn-sm btn-primary"
-                                    onClick={() => handleShift(task)}
-                                >
-                                    Shift to {formatDate(task.suggested_date)}
-                                </button>
-                                <button
-                                    className="btn btn-sm btn-outline"
-                                    onClick={() =>
-                                        handleDismiss(task.execution_log_id)
-                                    }
-                                >
-                                    Keep {formatDate(task.current_deadline)}
-                                </button>
-                            </div>
+                            {viewType === 'SELF' ? (
+                                <div style={{
+                                    padding: '8px 12px',
+                                    background: '#f5f5f5',
+                                    borderRadius: 6,
+                                    fontSize: 13,
+                                    color: '#666',
+                                    textAlign: 'center'
+                                }}>
+                                    View-only mode.
+                                </div>
+                            ) : (
+                                <div className="btn-group">
+                                    <button
+                                        className="btn btn-sm btn-primary"
+                                        onClick={() => handleShift(task)}
+                                    >
+                                        Shift to {formatDate(task.suggested_date)}
+                                    </button>
+                                    <button
+                                        className="btn btn-sm btn-outline"
+                                        onClick={() =>
+                                            handleDismiss(task.execution_log_id)
+                                        }
+                                    >
+                                        Keep {formatDate(task.current_deadline)}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </>

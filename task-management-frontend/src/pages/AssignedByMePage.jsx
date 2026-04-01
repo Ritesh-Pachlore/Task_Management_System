@@ -1,3 +1,4 @@
+// src/pages/AssignedByMePage.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
@@ -46,9 +47,19 @@ const AssignedByMePage = () => {
                 title: 'Extend Deadline',
                 showDate: true,
             });
+        } else if (actionType === 'edit') {
+            setActionModal({
+                task,
+                actionType: 'edit',
+                title: 'Edit Task',
+                showDate: false,
+            });
         } else {
             const titles = {
-                3: 'Approve Task', 4: 'Reject Task', 6: 'Cancel Task', 7: 'Put On Hold',
+                3: 'Approve Task',
+                4: 'Reject Task',
+                6: 'Cancel Task',
+                8: 'Put On Hold',
             };
             setActionModal({
                 task,
@@ -58,15 +69,45 @@ const AssignedByMePage = () => {
         }
     };
 
-    const submitAction = async ({ remarks, extended_date }) => {
+    const submitAction = async ({ remarks, extended_date, title, description, emp_list }) => {
         try {
+            if (actionModal.actionType === 'edit') {
+                // ✅ Validate required fields
+                if (!title?.trim() || !description?.trim()) {
+                    toast.error("Title and Description are required");
+                    return;
+                }
+
+                // ✅ Prepare payload
+                const payload = {
+                    execution_log_id: actionModal.task.execution_log_id,
+                    title: title.trim(),
+                    description: description.trim(),
+                };
+
+                if (emp_list?.trim()) payload.emp_list = emp_list.trim();
+                if (extended_date?.trim()) payload.deadline = extended_date.trim();
+
+                // ✅ Send POST to backend
+                const response = await api.post('/tasks/edit/', payload);
+
+                if (response.data.success) {
+                    toast.success('Task updated successfully!');
+                    setActionModal(null);
+                    fetchTasks(); // refresh list
+                } else {
+                    toast.error(response.data.message || "Failed to update task");
+                }
+                return;
+            }
+
+            // ---------------- EXTEND TASK ----------------
             if (actionModal.actionType === 'extend') {
                 if (!extended_date) {
                     toast.error('Please select a date');
                     return;
                 }
 
-                // Check if date is holiday
                 const checkResponse = await api.get(
                     `/tasks/check-date/?date=${extended_date}`
                 );
@@ -82,7 +123,6 @@ const AssignedByMePage = () => {
                     return;
                 }
 
-                // Date is fine — extend directly
                 const response = await api.post('/tasks/extend/', {
                     execution_log_id: actionModal.task.execution_log_id,
                     extended_date,
@@ -94,6 +134,7 @@ const AssignedByMePage = () => {
                     fetchTasks();
                 }
             } else {
+                // ---------------- OTHER ACTIONS ----------------
                 const response = await api.post('/tasks/update-status/', {
                     execution_log_id: actionModal.task.execution_log_id,
                     action_type: actionModal.actionType,
@@ -104,10 +145,11 @@ const AssignedByMePage = () => {
                     setActionModal(null);
                     fetchTasks();
                 } else {
-                    toast.error(response.data.message);
+                    toast.error(response.data.message || "Action failed");
                 }
             }
         } catch (error) {
+            console.error(error.response?.data || error); // ✅ log exact backend error
             toast.error('Action failed');
         }
     };
@@ -154,7 +196,7 @@ const AssignedByMePage = () => {
                 <h1>Assigned By Me</h1>
             </div>
 
-            <TaskFilters filters={filters} setFilters={setFilters} showEmployeeFilter />
+            <TaskFilters filters={filters} setFilters={setFilters} showEmployeeFilter showDateFilter={true} />
 
             {loading ? (
                 <div className="loading-container"><div className="spinner" /></div>
@@ -180,6 +222,7 @@ const AssignedByMePage = () => {
                     showDate={actionModal.showDate}
                     onSubmit={submitAction}
                     onClose={() => setActionModal(null)}
+                    actionModal={actionModal}
                 />
             )}
 

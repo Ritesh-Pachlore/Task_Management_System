@@ -19,7 +19,7 @@ const Header = () => {
                         {user?.full_name || user?.emp_name || 'User'}
                     </span>
                     <span className="header-emp-id">
-                        (ID: {user?.emp_id})
+                        (ID:{user?.emp_id})
                     </span>
                 </div>
                 <button className="header-logout" onClick={logout} title="Logout">

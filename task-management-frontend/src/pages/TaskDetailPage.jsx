@@ -19,7 +19,6 @@ const TaskDetailPage = () => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // ← wrap with useCallback
     const fetchHistory = useCallback(async () => {
         setLoading(true);
         try {
@@ -33,11 +32,11 @@ const TaskDetailPage = () => {
             toast.error('Failed to load history');
         }
         setLoading(false);
-    }, [executionLogId]);  // ← executionLogId is real dependency
+    }, [executionLogId]);
 
     useEffect(() => {
         fetchHistory();
-    }, [fetchHistory]);  // ← now correct
+    }, [fetchHistory]);
 
     if (loading) {
         return (
